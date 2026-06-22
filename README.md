@@ -1,5 +1,9 @@
 # Personal Performance Dashboard
 
+> ### 👉 Just want it running? Follow **[START_HERE.md](START_HERE.md)** — 6 steps, ~20 minutes, no coding.
+>
+> [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https%3A%2F%2Fgithub.com%2Fridwanmao93-wq%2Fnew&env=NEXT_PUBLIC_SUPABASE_URL,NEXT_PUBLIC_SUPABASE_ANON_KEY,SUPABASE_URL,SUPABASE_ANON_KEY,SUPABASE_SERVICE_ROLE_KEY,OURA_ACCESS_TOKEN,CRON_SECRET&envDescription=Paste%20your%20Supabase%20keys%20and%20Oura%20token&envLink=https%3A%2F%2Fgithub.com%2Fridwanmao93-wq%2Fnew%2Fblob%2Fmain%2FSTART_HERE.md)
+
 A private **personal operating system** that connects physical health, mindset,
 CBT / self-esteem practice, sobriety, discipline, relationships, money and
 weekly review into one dashboard — built to help you stay **sober, courageous,
