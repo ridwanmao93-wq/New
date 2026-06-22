@@ -13,17 +13,13 @@ import {
   TrendingUp,
   Sparkles,
   Settings,
-  Sun,
-  MoonStar,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 const items = [
   { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
-  { href: "/daily-check-in", label: "Daily Check-In", icon: Sun },
   { href: "/morning", label: "Morning", icon: Sunrise },
   { href: "/evening", label: "Evening", icon: Moon },
-  { href: "/evening-shutdown", label: "Evening Shutdown", icon: MoonStar },
   { href: "/workout", label: "Workout", icon: Dumbbell },
   { href: "/weight", label: "Weight", icon: Scale },
   { href: "/hydration", label: "Hydration", icon: Droplets },

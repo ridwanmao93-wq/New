@@ -64,39 +64,146 @@ async function save(
 
 /* ------------------------------ CBT ------------------------------ */
 
+/**
+ * Morning routine — one submit that saves the morning CBT practice plus
+ * the momentum checklist (with "most important action") and the
+ * anti-avoidance plan (the hardest thing + triggers). Nothing is
+ * mandatory; empty sections are simply skipped.
+ */
 export async function saveMorning(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const raw = formObject(formData);
-  // sentence stems arrive as a JSON string from the client component.
+
+  // Sentence stems arrive as a JSON string from the client component.
   let stems: unknown = [];
   try {
     stems = JSON.parse((raw.sentence_stems as string) || "[]");
   } catch {
     return { ok: false, error: "Sentence stems were malformed." };
   }
-  const parsed = morningSchema.safeParse({ ...raw, sentence_stems: stems });
-  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
-  const d = parsed.data;
-  return save("cbt_morning_entries", {
-    date: d.date,
-    mood_score: d.mood_score,
-    energy_score: d.energy_score,
-    hopefulness_score: d.hopefulness_score,
-    centering_completed: d.centering_completed,
-    sentence_stems_json: d.sentence_stems,
-    identity_action_statement: d.identity_action_statement,
-    fully_accepted_success_response: d.fully_accepted_success_response,
-    no_longer_needed_to_suffer_response: d.no_longer_needed_to_suffer_response,
-    identity_releasing: d.identity_releasing,
-    identity_stepping_into: d.identity_stepping_into,
-    affirmation_completed: d.affirmation_completed,
-    notes: d.notes,
-  });
+  const cbt = morningSchema.safeParse({ ...raw, sentence_stems: stems });
+  if (!cbt.success) return { ok: false, error: zodMessage(cbt.error) };
+  const m = cbt.data;
+
+  const mom = momentumSchema.safeParse(raw);
+  const aa = antiAvoidanceSchema.safeParse(raw);
+
+  try {
+    const { supabase, userId } = await requireUser();
+
+    const cbtRes = await supabase.from("cbt_morning_entries").insert({
+      user_id: userId,
+      date: m.date,
+      mood_score: m.mood_score,
+      energy_score: m.energy_score,
+      hopefulness_score: m.hopefulness_score,
+      centering_completed: m.centering_completed,
+      sentence_stems_json: m.sentence_stems,
+      identity_action_statement: m.identity_action_statement,
+      fully_accepted_success_response: m.fully_accepted_success_response,
+      no_longer_needed_to_suffer_response: m.no_longer_needed_to_suffer_response,
+      identity_releasing: m.identity_releasing,
+      identity_stepping_into: m.identity_stepping_into,
+      affirmation_completed: m.affirmation_completed,
+      notes: m.notes,
+    });
+    if (cbtRes.error) return { ok: false, error: cbtRes.error.message };
+
+    // Momentum (commit to today's items + most important action).
+    if (mom.success) {
+      const d = mom.data;
+      const momRes = await supabase.from("daily_momentum_entries").upsert(
+        {
+          user_id: userId,
+          date: d.date,
+          morning_cbt_completed: d.morning_cbt_completed,
+          evening_cbt_completed: d.evening_cbt_completed,
+          workout_completed: d.workout_completed,
+          hydration_goal_hit: d.hydration_goal_hit,
+          no_cannabis: d.no_cannabis,
+          family_connection_completed: d.family_connection_completed,
+          business_growth_action_completed: d.business_growth_action_completed,
+          hardest_thing_done: d.hardest_thing_done,
+          most_important_action: d.most_important_action,
+          momentum_score: d.momentum_score,
+        },
+        { onConflict: "user_id,date" }
+      );
+      if (momRes.error) return { ok: false, error: momRes.error.message };
+    }
+
+    // Anti-avoidance plan (only when there's a hardest thing to face).
+    if (aa.success && aa.data.hardest_thing_i_did_not_want_to_do) {
+      const a = aa.data;
+      const aaRes = await supabase.from("anti_avoidance_entries").upsert(
+        {
+          user_id: userId,
+          date: a.date,
+          hardest_thing_i_did_not_want_to_do: a.hardest_thing_i_did_not_want_to_do,
+          avoidance_trigger: a.avoidance_trigger,
+          what_helped_me_take_action: a.what_helped_me_take_action,
+        },
+        { onConflict: "user_id,date" }
+      );
+      if (aaRes.error) return { ok: false, error: aaRes.error.message };
+    }
+
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Morning routine saved. Go make it a great day." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
 }
 
+/**
+ * Evening routine — saves the evening reflection plus a sobriety check
+ * and the anti-avoidance review (did I do the hard thing from this
+ * morning, and why / why not). Nothing is mandatory.
+ */
 export async function saveEvening(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = eveningSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
-  return save("cbt_evening_entries", parsed.data);
+  const raw = formObject(formData);
+  const ev = eveningSchema.safeParse(raw);
+  if (!ev.success) return { ok: false, error: zodMessage(ev.error) };
+
+  const sob = sobrietySchema.safeParse(raw);
+
+  try {
+    const { supabase, userId } = await requireUser();
+
+    const evRes = await supabase.from("cbt_evening_entries").insert({ ...ev.data, user_id: userId });
+    if (evRes.error) return { ok: false, error: evRes.error.message };
+
+    if (sob.success) {
+      const sobRes = await supabase
+        .from("sobriety_entries")
+        .upsert({ ...sob.data, user_id: userId }, { onConflict: "user_id,date" });
+      if (sobRes.error) return { ok: false, error: sobRes.error.message };
+    }
+
+    // Anti-avoidance review — update today's row (hardest thing carried
+    // over from the morning), recording whether it got done and why.
+    const hardest = (raw.hardest_thing_i_did_not_want_to_do as string)?.trim();
+    const why = (raw.why_or_why_not as string)?.trim();
+    const didItRaw = (raw.did_i_do_it as string) ?? "";
+    const didIt = ["true", "on", "1", "yes"].includes(didItRaw.toLowerCase());
+    if (hardest || why || didIt) {
+      const aaRes = await supabase.from("anti_avoidance_entries").upsert(
+        {
+          user_id: userId,
+          date: ev.data.date,
+          hardest_thing_i_did_not_want_to_do: hardest || undefined,
+          did_i_do_it: didIt,
+          notes: why || undefined,
+        },
+        { onConflict: "user_id,date" }
+      );
+      if (aaRes.error) return { ok: false, error: aaRes.error.message };
+    }
+
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Evening saved. Rest well." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
 }
 
 /* --------------------------- Tracking ---------------------------- */
@@ -220,45 +327,7 @@ export async function runWeeklyReview(
   }
 }
 
-/* ------------------- Combined daily check-in --------------------- */
-
-/**
- * One submit that fans out into morning CBT + alignment + sobriety +
- * momentum + anti-avoidance for the day. Used by /daily-check-in.
- */
-export async function saveDailyCheckIn(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const results = await Promise.all([
-    saveMorning(_prev, formData),
-    saveAlignment(_prev, formData),
-    saveSobriety(_prev, formData),
-    saveMomentum(_prev, formData),
-    saveAntiAvoidance(_prev, formData),
-  ]);
-  const failed = results.find((r) => !r.ok);
-  if (failed) return failed;
-  revalidatePath("/dashboard");
-  return { ok: true, message: "Morning check-in saved. Go make it a great day." };
-}
-
-/**
- * Evening shutdown: evening CBT + sobriety + momentum review +
- * anti-avoidance review.
- */
-export async function saveEveningShutdown(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const results = await Promise.all([
-    saveEvening(_prev, formData),
-    saveSobriety(_prev, formData),
-    saveMomentum(_prev, formData),
-    saveAntiAvoidance(_prev, formData),
-  ]);
-  const failed = results.find((r) => !r.ok);
-  if (failed) return failed;
-  revalidatePath("/dashboard");
-  return { ok: true, message: "Evening shutdown complete. Rest well." };
-}
+// Note: the morning and evening routines are now single combined actions
+// (saveMorning / saveEvening above). The separate /daily-check-in and
+// /evening-shutdown pages were removed in favour of the Morning and
+// Evening tabs.
