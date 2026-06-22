@@ -14,23 +14,6 @@ async function requireUser() {
 }
 
 /**
- * Resolve the actor for a request: a signed-in user (session cookie),
- * or — for Vercel Cron — a valid CRON_SECRET bearer token combined
- * with DASHBOARD_USER_ID, which uses the service-role client.
- */
-async function resolveActor(request: Request) {
-  const { supabase, user } = await requireUser();
-  if (user) return { supabase, userId: user.id };
-
-  const auth = request.headers.get("authorization");
-  const secret = process.env.CRON_SECRET;
-  if (secret && auth === `Bearer ${secret}` && process.env.DASHBOARD_USER_ID) {
-    return { supabase: createAdminClient(), userId: process.env.DASHBOARD_USER_ID };
-  }
-  return null;
-}
-
-/**
  * POST /api/sync/oura
  * Syncs yesterday's Oura data for the authenticated user (upsert).
  * Optional JSON body: { "date": "YYYY-MM-DD" } to sync a specific day.
@@ -59,22 +42,65 @@ export async function POST(request: Request) {
 
 /**
  * GET /api/sync/oura?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD
- * Backfill a date range. Without params, defaults to yesterday.
+ *
+ * Two modes:
+ *  - Signed-in user (browser): syncs that user. Supports backfill params.
+ *  - Vercel Cron (valid CRON_SECRET bearer): syncs every user in the
+ *    `profiles` table automatically. No DASHBOARD_USER_ID needed — though
+ *    if it is set, only that user is synced.
  */
 export async function GET(request: Request) {
-  const actor = await resolveActor(request);
-  if (!actor) return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
-
   const { searchParams } = new URL(request.url);
   const startDate = searchParams.get("start_date") ?? undefined;
   const endDate = searchParams.get("end_date") ?? startDate ?? undefined;
 
+  // 1) Signed-in browser user.
+  const { supabase, user } = await requireUser();
+  if (user) {
+    try {
+      const result = await syncOura(supabase, user.id, { startDate, endDate });
+      return NextResponse.json({ ok: true, ...result });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : String(err);
+      console.error("❌ Oura sync (GET) failed:", message);
+      return NextResponse.json({ ok: false, error: message }, { status: 500 });
+    }
+  }
+
+  // 2) Vercel Cron — authenticated by CRON_SECRET.
+  const auth = request.headers.get("authorization");
+  const secret = process.env.CRON_SECRET;
+  if (!secret || auth !== `Bearer ${secret}`) {
+    return NextResponse.json({ ok: false, error: "Not authenticated" }, { status: 401 });
+  }
+
   try {
-    const result = await syncOura(actor.supabase, actor.userId, { startDate, endDate });
-    return NextResponse.json({ ok: true, ...result });
+    const admin = createAdminClient();
+
+    // Which users to sync: the configured one, or everyone (single-user
+    // apps "just work" with zero extra config).
+    let userIds: string[];
+    if (process.env.DASHBOARD_USER_ID) {
+      userIds = [process.env.DASHBOARD_USER_ID];
+    } else {
+      const { data, error } = await admin.from("profiles").select("id");
+      if (error) throw new Error(error.message);
+      userIds = (data ?? []).map((r: { id: string }) => r.id);
+    }
+
+    const results = [];
+    for (const id of userIds) {
+      try {
+        const r = await syncOura(admin, id, { startDate, endDate });
+        results.push({ userId: id, ok: true, synced: r.synced, days: r.days });
+      } catch (err) {
+        results.push({ userId: id, ok: false, error: err instanceof Error ? err.message : String(err) });
+      }
+    }
+    return NextResponse.json({ ok: true, users: results.length, results });
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
-    console.error("❌ Oura sync (GET) failed:", message);
+    console.error("❌ Oura cron sync failed:", message);
     return NextResponse.json({ ok: false, error: message }, { status: 500 });
   }
 }
