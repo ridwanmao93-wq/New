@@ -26,9 +26,8 @@ export default async function DashboardPage() {
       <PageHeader title="Dashboard" subtitle={`Your operating system · ${d.td}`} />
 
       {/* ===== TOP SECTION — orient the day ===== */}
-      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <section className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <StatCard label="Sober streak" value={d.currentSoberStreak} suffix=" d" accent />
-        <StatCard label="Alignment today" value={d.todayAlignment?.daily_alignment_score} accent />
         <StatCard label="Momentum today" value={d.todayMomentum?.momentum_score} suffix="%" accent />
         <StatCard
           label="Stepping into"
@@ -57,8 +56,6 @@ export default async function DashboardPage() {
           <StatCard label="Hydration" value={d.hydrationPctToday} suffix="%" />
           <StatCard label="Morning CBT (wk)" value={`${d.morningDaysThisWeek}/7`} />
           <StatCard label="Evening CBT (wk)" value={`${d.eveningDaysThisWeek}/7`} />
-          <StatCard label="Alignment 7d avg" value={d.alignment7} />
-          <StatCard label="Alignment 30d avg" value={d.alignment30} />
           <StatCard label="Momentum 7d avg" value={d.momentum7} suffix="%" />
           <StatCard label="Momentum 30d avg" value={d.momentum30} suffix="%" />
         </div>
@@ -152,7 +149,6 @@ export default async function DashboardPage() {
           <ChartCard title="Mood · 30 days" data={d.series.mood30} domain={[0, 10]} />
           <ChartCard title="Energy · 7 days" data={d.series.energy} domain={[0, 10]} color="hsl(45 93% 58%)" />
           <ChartCard title="Hopefulness · 7 days" data={d.series.hopefulness} domain={[0, 10]} color="hsl(150 70% 55%)" />
-          <ChartCard title="Alignment · 30 days" data={d.series.alignment} domain={[0, 10]} color="hsl(280 70% 65%)" />
           <ChartCard title="Momentum · 30 days" data={d.series.momentum} domain={[0, 100]} color="hsl(199 89% 58%)" />
           <ChartCard title="Sleep score · 30 days" data={d.series.sleep} color="hsl(199 89% 58%)" />
           <ChartCard title="Readiness · 30 days" data={d.series.readiness} color="hsl(150 70% 55%)" />

@@ -8,6 +8,12 @@ export const scoreSchema = z.coerce
   .min(1, "Must be at least 1")
   .max(10, "Must be at most 10");
 
+/** Optional 1–10 score — blank is allowed (nothing is mandatory). */
+export const optionalScore = z
+  .union([z.literal(""), scoreSchema])
+  .optional()
+  .transform((v) => (v === "" ? undefined : v));
+
 /** ISO date, defaulting to today when blank/missing. */
 export const dateSchema = z
   .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")])
@@ -31,25 +37,20 @@ const optionalPositive = z
 /* Morning practice                                                    */
 /* ------------------------------------------------------------------ */
 
-/** A single sentence-completion stem with 5–10 short responses. */
+/** A single sentence-completion stem with up to 10 short responses (optional). */
 export const sentenceStemSchema = z.object({
   stem: z.string().min(1, "Stem is required"),
-  responses: z
-    .array(z.string().min(1))
-    .min(5, "Each stem needs at least 5 responses")
-    .max(10, "Each stem allows at most 10 responses"),
+  responses: z.array(z.string().min(1)).max(10, "Each stem allows at most 10 responses"),
 });
 
 export const morningSchema = z.object({
   date: dateSchema,
-  mood_score: scoreSchema,
-  energy_score: scoreSchema,
-  hopefulness_score: scoreSchema,
+  mood_score: optionalScore,
+  energy_score: optionalScore,
+  hopefulness_score: optionalScore,
   centering_completed: z.coerce.boolean().optional().default(false),
-  sentence_stems: z
-    .array(sentenceStemSchema)
-    .min(2, "Choose 2–3 sentence stems")
-    .max(3, "Choose at most 3 sentence stems"),
+  // Sentence completion is entirely optional.
+  sentence_stems: z.array(sentenceStemSchema).max(3, "Choose at most 3 sentence stems").optional().default([]),
   identity_action_statement: optionalText,
   fully_accepted_success_response: optionalText,
   no_longer_needed_to_suffer_response: optionalText,
@@ -66,9 +67,9 @@ export type MorningInput = z.infer<typeof morningSchema>;
 
 export const eveningSchema = z.object({
   date: dateSchema,
-  mood_score: scoreSchema,
-  energy_score: scoreSchema,
-  hopefulness_score: scoreSchema,
+  mood_score: optionalScore,
+  energy_score: optionalScore,
+  hopefulness_score: optionalScore,
   reflection_notes: optionalText,
   gratitude: optionalText,
   surrender_statement: optionalText,
