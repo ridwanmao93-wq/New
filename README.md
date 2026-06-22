@@ -1,256 +1,254 @@
 # Personal Performance Dashboard
 
-One small, reliable system that pulls your **Oura Ring**, **hydration**, **CBT
-morning/evening practice**, **workouts**, and **weight** into a single
-**Airtable** base — ready to visualise in **Looker Studio**.
+A private **personal operating system** that connects physical health, mindset,
+CBT / self-esteem practice, sobriety, discipline, relationships, money and
+weekly review into one dashboard — built to help you stay **sober, courageous,
+disciplined, healthy, and aligned with your values**.
 
-- **Oura data** syncs automatically once per day (yesterday's data).
-- **CBT, workouts, weight, hydration** are entered through simple web forms.
-- **Everything lands in Airtable** as the single source of truth.
-- **Export endpoints** produce clean JSON/CSV for Looker Studio.
+It is **not** a generic habit tracker. It is designed around:
 
-Built with Node.js + TypeScript + Express, validated with Zod, scheduled with
-node-cron. No over-engineering — the goal is that the data lands cleanly.
+- 🟦 **Oura** biometrics (auto-synced daily)
+- 🌅 **Morning** self-esteem / CBT practice (centering, self-rating, sentence
+  completion, identity-aware action, affirmation)
+- 🌙 **Evening** reflection (lightweight — gratitude & surrender)
+- 🏋️ **Workout** consistency
+- 💧 **Hydration** (manual now; extendable to LARQ / Apple Health later)
+- ⚖️ **Weight** & progress
+- 🎯 **Daily Alignment**, **Sobriety**, **Momentum**, **Anti-Avoidance**,
+  **Relationships**, **Debt freedom**, and a **Future Self** page
+- 📊 **Weekly reviews** and **plain-English correlations**
 
 ---
 
-## 1. Quick start (local)
+## 1. Tech stack
+
+- **Next.js 14** (App Router) + **TypeScript**
+- **Tailwind CSS** + **shadcn/ui** (dark mode, card-based, mobile-friendly)
+- **Supabase** (PostgreSQL + Auth, row-level security)
+- **Recharts** for charts
+- **Zod** for validation
+- **Oura API v2**
+- Deployable to **Vercel** (with Vercel Cron for the daily Oura sync)
+
+---
+
+## 2. Setup (local)
 
 ```bash
 git clone <your-repo>
 cd <repo>
 npm install
-cp .env.example .env      # then fill in your secrets (see below)
-npm run dev               # http://localhost:3000
+cp .env.example .env.local   # fill in your values (see §4)
+npm run dev                  # http://localhost:3000
 ```
-
-Open <http://localhost:3000> for the home page, or
-<http://localhost:3000/dashboard> for the dashboard.
 
 ### npm scripts
 
-| Script | What it does |
+| Script | Purpose |
 | --- | --- |
-| `npm run dev` | Run with live reload (ts-node + nodemon) |
-| `npm run build` | Compile TypeScript to `dist/` |
-| `npm start` | Run the compiled server (`dist/server.js`) |
-| `npm run sync:oura` | Sync yesterday's Oura data (or `npm run sync:oura 2026-06-20`) |
-| `npm run scorecard` | Generate the weekly scorecard for the last 7 days |
+| `npm run dev` | Start the dev server |
+| `npm run build` | Production build |
+| `npm start` | Run the production build |
+| `npm run lint` | Lint |
+| `npm run sync:oura` | Sync Oura (yesterday) — `npm run sync:oura 2026-06-01 2026-06-07` to backfill |
+| `npm run generate:weekly-review` | Generate this week’s review |
 
 ---
 
-## 2. Environment variables
+## 3. Supabase setup
 
-Copy `.env.example` to `.env` and fill in:
+1. Create a project at <https://supabase.com>.
+2. **Settings → API**: copy the **Project URL**, the **anon** key, and the
+   **service_role** key into your env (see §4).
+3. **Database migration** — open **SQL Editor**, paste the contents of
+   [`supabase/migrations/0001_init.sql`](supabase/migrations/0001_init.sql),
+   and run it. This creates every table, the auto-profile trigger, indexes,
+   and **row-level security** so each user only sees their own rows.
+   - (Optional, with the Supabase CLI: `supabase db push`.)
+4. **Auth** — under **Authentication → Providers**, keep **Email** enabled.
+   Because this is a private single-user app, after you sign up once you can
+   **disable new sign-ups** (Authentication → Settings) to lock it down.
+
+### Database tables
+
+`profiles`, `oura_daily_metrics`, `cbt_morning_entries`,
+`cbt_evening_entries`, `workouts`, `weight_entries`, `hydration_entries`,
+`weekly_reviews`, plus the Life-OS tables: `daily_alignment_entries`,
+`sobriety_entries`, `debt_entries`, `daily_momentum_entries`,
+`anti_avoidance_entries`, `relationship_entries`, `future_self_goals`.
+All fields are defined in the migration file.
+
+---
+
+## 4. Environment variables
+
+Copy `.env.example` → `.env.local` and fill in:
 
 ```
-AIRTABLE_API_KEY=        # Personal access token from airtable.com/create/tokens
-AIRTABLE_BASE_ID=        # Starts with "app...", from the API docs of your base
-AIRTABLE_DAILY_HEALTH_TABLE=Daily Health Metrics
-AIRTABLE_CBT_MORNING_TABLE=CBT Morning Entries
-AIRTABLE_CBT_EVENING_TABLE=CBT Evening Entries
-AIRTABLE_WORKOUTS_TABLE=Workouts
-AIRTABLE_WEIGHT_TABLE=Weight Tracking
-AIRTABLE_HYDRATION_TABLE=Hydration
-AIRTABLE_WEEKLY_SCORECARD_TABLE=Weekly Scorecard
+NEXT_PUBLIC_SUPABASE_URL=        # Supabase Project URL
+NEXT_PUBLIC_SUPABASE_ANON_KEY=   # anon public key
 
-OURA_ACCESS_TOKEN=       # Personal access token from cloud.ouraring.com
+SUPABASE_URL=                    # same Project URL (server-side)
+SUPABASE_ANON_KEY=               # same anon key (server-side)
+SUPABASE_SERVICE_ROLE_KEY=       # service_role key — server only, keep secret
 
-PORT=3000
-CRON_ENABLED=true
-OURA_SYNC_CRON=0 6 * * * # daily at 06:00 server time
+OURA_ACCESS_TOKEN=               # Oura Personal Access Token
+
+CRON_SECRET=                     # any random string (for Vercel Cron / CLI)
+DASHBOARD_USER_ID=               # your Supabase auth user id (for cron/CLI)
 ```
 
-Secrets are never hardcoded — the app validates the environment on boot and
-exits with a clear message if anything required is missing.
+Secrets are never hardcoded. The service-role key is only ever used on the
+server (API routes / CLI) and never shipped to the browser.
 
 ---
 
-## 3. Airtable setup
-
-1. Create a new **base** (e.g. "Performance Dashboard").
-2. Create an **API token** at <https://airtable.com/create/tokens> with the
-   `data.records:read` and `data.records:write` scopes, granted access to your
-   base. Put it in `AIRTABLE_API_KEY`.
-3. Find your **Base ID** (starts with `app…`) at
-   <https://airtable.com/api> → select your base. Put it in `AIRTABLE_BASE_ID`.
-4. Create the **7 tables** below. Field names must match exactly (the app maps
-   to them by name). Table names can be anything — just keep them in sync with
-   the `AIRTABLE_*_TABLE` env vars.
-
-> Tip: the **Date** field in each table should be an Airtable *Date* field.
-> Score fields can be *Number*. `Completed Yes/No` and `Source` work well as
-> *Single select*. Everything else can be *Single line text* / *Long text*.
-
-### Tables & fields
-
-**Daily Health Metrics** — `Date`, `Oura Sleep Score`, `Oura Readiness Score`,
-`Oura Activity Score`, `Total Sleep Duration`, `Resting Heart Rate`, `HRV`,
-`Steps`, `Calories Burned`, `Sleep Efficiency`, `Deep Sleep Duration`,
-`REM Sleep Duration`, `Awake Time`, `Source`, `Synced At`
-
-**CBT Morning Entries** — `Date`, `Mood Score 1-10`, `Energy Score 1-10`,
-`Hopefulness Score 1-10`, `Sentence Completion Stem 1`,
-`Sentence Completion Answers 1`, `Sentence Completion Stem 2`,
-`Sentence Completion Answers 2`, `Today I will act like`,
-`One action aligned with my values today`, `One small goal for today`,
-`Notes`, `Created At`
-
-**CBT Evening Entries** — `Date`, `Mood Score 1-10`, `Energy Score 1-10`,
-`Hopefulness Score 1-10`, `What went well`, `Where I acted with values`,
-`Key emotions`, `Trigger/Event`, `Automatic Thought`, `Cognitive Distortion`,
-`Balanced Perspective`, `Gratitude 1`, `Gratitude 2`, `Gratitude 3`, `Notes`,
-`Created At`
-
-**Workouts** — `Date`, `Workout Type`, `Duration Minutes`, `Exercises`,
-`Sets/Reps/Weight`, `Intensity 1-10`, `Completed Yes/No`, `Notes`, `Created At`
-
-**Weight Tracking** — `Date`, `Weight`, `Waist Measurement`,
-`Progress Photo URL`, `Notes`, `Created At`
-
-**Hydration** — `Date`, `Water Intake ML`, `Water Intake OZ`,
-`Hydration Goal ML`, `Hydration Goal Percentage`, `Source`, `Notes`,
-`Created At`
-
-**Weekly Scorecard** — `Week Start Date`, `Week End Date`, `Average Mood`,
-`Average Energy`, `Average Hopefulness`, `Average Sleep Score`,
-`Average Readiness Score`, `Average HRV`, `Average Resting Heart Rate`,
-`Average Weight`, `Workouts Completed`, `Average Water Goal Percentage`,
-`CBT Morning Completion %`, `CBT Evening Completion %`, `Weekly Reflection`,
-`Created At`
-
----
-
-## 4. Oura setup
+## 5. Oura API setup
 
 1. Go to <https://cloud.ouraring.com/personal-access-tokens> and create a
    **Personal Access Token**.
 2. Put it in `OURA_ACCESS_TOKEN`.
-3. Test it:
+3. Test it from the **Settings** page (“Sync Oura now”) or via CLI:
    ```bash
-   npm run sync:oura          # syncs yesterday into Daily Health Metrics
+   npm run sync:oura
    ```
 
-The sync **upserts by date** — running it again for the same day updates the
-existing row instead of creating a duplicate. The daily cron job (when
-`CRON_ENABLED=true`) syncs **yesterday's** data, because the current day's
-metrics are incomplete until the ring syncs after sleep.
+The sync **upserts on (user_id, date)** so re-running never creates duplicate
+rows. The daily job syncs **yesterday** (the current day is incomplete until
+the ring syncs after sleep).
 
 ---
 
-## 5. Pages & routes
+## 6. Running locally
 
-### Forms (browser)
+```bash
+npm run dev
+```
 
-| Route | Purpose |
+- Visit `/login`, create an account, then you’re routed to `/dashboard`.
+- Middleware protects every page and redirects to `/login` when signed out.
+
+---
+
+## 7. Deploy to Vercel
+
+1. Push the repo to GitHub and **Import** it in Vercel.
+2. Add all environment variables from §4 in **Project → Settings →
+   Environment Variables**.
+3. Deploy. `vercel.json` registers a **daily cron** at `06:00 UTC` that calls
+   `GET /api/sync/oura`. Vercel automatically sends
+   `Authorization: Bearer $CRON_SECRET`; the route then uses the service-role
+   client with `DASHBOARD_USER_ID` to sync without a browser session.
+4. In Supabase **Authentication → URL Configuration**, set your Vercel URL as
+   the Site URL.
+
+---
+
+## 8. Syncing Oura data
+
+- **UI:** Settings → “Sync Oura now (yesterday)”.
+- **API:** `POST /api/sync/oura` (yesterday) or
+  `GET /api/sync/oura?start_date=YYYY-MM-DD&end_date=YYYY-MM-DD` (backfill).
+- **CLI:** `npm run sync:oura` or `npm run sync:oura 2026-06-01 2026-06-07`.
+- **Cron:** automatic daily via `vercel.json`.
+
+---
+
+## 9. Generating weekly reviews
+
+- **UI:** `/weekly-review` → “Generate Weekly Review” (add reflection notes &
+  intentions first).
+- **API:** `POST /api/generate-weekly-review`.
+- **CLI:** `npm run generate:weekly-review`.
+
+It aggregates the previous 7 days: CBT averages, Oura averages, workout count,
+hydration average, morning/evening completion %, and current/longest streaks,
+then upserts a `weekly_reviews` row.
+
+---
+
+## 10. Pages
+
+| Route | What it does |
 | --- | --- |
-| `/morning` | Morning CBT practice |
-| `/evening` | Evening CBT practice |
-| `/workout` | Log a workout |
-| `/weight` | Log weight / measurements |
-| `/hydration` | Log water intake (ML or OZ; the other is auto-calculated) |
-| `/dashboard` | Snapshot + 7-day trend tables |
-
-### API
-
-| Method | Route | Purpose |
-| --- | --- | --- |
-| `POST` | `/api/sync/oura` | Sync Oura data. Optional body `{ "date": "YYYY-MM-DD" }` (defaults to yesterday) |
-| `POST` | `/api/generate-weekly-scorecard` | Aggregate the last 7 days into the Weekly Scorecard table |
-| `GET` | `/api/export/daily-health` | Export Daily Health Metrics |
-| `GET` | `/api/export/cbt` | Export combined morning+evening CBT |
-| `GET` | `/api/export/workouts` | Export Workouts |
-| `GET` | `/api/export/weight` | Export Weight Tracking |
-| `GET` | `/api/export/hydration` | Export Hydration |
-| `GET` | `/api/export/weekly-scorecard` | Export Weekly Scorecard |
-| `GET` | `/healthz` | Health check |
-
-All export endpoints return JSON by default. Append `?format=csv` for CSV.
+| `/dashboard` | Top section (sober streak, alignment, momentum, identity, debt, most important action) + core stats + sobriety/identity/debt cards + trend charts |
+| `/daily-check-in` | One morning page: morning CBT + alignment + sobriety + momentum + anti-avoidance + most important action |
+| `/morning` | Full morning practice |
+| `/evening` | Lightweight evening practice |
+| `/evening-shutdown` | Evening CBT + sobriety + momentum review + anti-avoidance + gratitude/surrender |
+| `/workout` `/weight` `/hydration` | Tracking forms |
+| `/weekly-review` | Generate & view weekly reviews |
+| `/correlations` | Plain-English insight cards |
+| `/future-self` | 12-month statement + goals with progress bars |
+| `/settings` | Profile, goals, Oura token instructions, manual sync |
 
 ---
 
-## 6. Looker Studio
+## 11. Validation (Zod)
 
-You have two easy options:
-
-**Option A — Google Sheet (recommended, most reliable):**
-1. Open each export in your browser with `?format=csv`, e.g.
-   `https://your-app.onrender.com/api/export/daily-health?format=csv`.
-2. Import into a Google Sheet (one tab per table), or use
-   `=IMPORTDATA("…?format=csv")` to keep it live.
-3. In Looker Studio, add the Google Sheet as a data source.
-
-**Option B — JSON connector:** point a community JSON/REST connector at the
-JSON export endpoints.
-
-Build charts on mood/sleep/readiness trends, weekly scorecard, hydration %, etc.
+- Mood / energy / hopefulness / intensity / alignment scores must be **1–10**.
+- Weight and hydration must be **positive**.
+- Dates are required and **default to today** when blank.
+- Morning practice requires **2–3 sentence stems**, each with **5–10**
+  responses.
+- Alignment score = average of its four sub-scores; momentum score = % of the
+  eight items completed (computed automatically).
 
 ---
 
-## 7. Validation rules (Zod)
+## 12. Future improvements
 
-- All 1–10 scores are rejected outside the 1–10 range.
-- Morning/evening require mood, energy and hopefulness.
-- Weight requires a positive number.
-- Hydration requires either ML or OZ; the missing unit and goal % are derived.
-- **Date** defaults to today if not provided, and must be `YYYY-MM-DD`.
-
----
-
-## 8. Deployment
-
-The app is a standard long-running Node server, so it deploys cleanly to
-platforms that keep a process alive (so the daily cron runs).
-
-### Render (recommended — includes `render.yaml`)
-1. Push this repo to GitHub.
-2. In Render: **New → Blueprint**, pick the repo. It reads `render.yaml`.
-3. Fill in `AIRTABLE_API_KEY`, `AIRTABLE_BASE_ID`, `OURA_ACCESS_TOKEN` as secrets.
-4. Deploy. The included `Procfile` also works for buildpack-style deploys.
-
-### Railway
-1. New project from repo. Build: `npm install && npm run build`. Start: `npm start`.
-2. Add the env vars from `.env.example`.
-
-### Vercel
-Vercel is serverless, so a persistent `node-cron` won't run reliably. Two
-options: (a) deploy the Express app and set `CRON_ENABLED=false`, then add a
-**Vercel Cron Job** that hits `POST /api/sync/oura` daily; or (b) prefer
-Render/Railway for the always-on cron. The forms, dashboard and exports work
-fine on Vercel either way.
+- LARQ / Apple Health hydration import (the `source` field is already in place).
+- kg/lbs toggle (defaults to lbs today).
+- Push reminders for the morning check-in and evening shutdown.
+- Richer analytics (rolling correlations, anomaly flags).
+- Progress-photo uploads via Supabase Storage.
 
 ---
 
-## 9. Acceptance checklist
+## Acceptance checklist
 
-1. ✅ Submit a morning CBT entry → appears in Airtable
-2. ✅ Submit an evening CBT entry → appears in Airtable
-3. ✅ Submit a workout → appears in Airtable
-4. ✅ Submit weight → appears in Airtable
-5. ✅ Submit hydration → appears in Airtable
-6. ✅ `POST /api/sync/oura` (or `npm run sync:oura`) → yesterday's metrics in Airtable
-7. ✅ Re-running Oura sync updates, never duplicates
-8. ✅ `POST /api/generate-weekly-scorecard` (or `npm run scorecard`) → scorecard row
-9. ✅ `/dashboard` renders the snapshot + trends
-10. ✅ `/api/export/*` returns clean JSON/CSV for Looker Studio
+1. ✅ Sign in (Supabase Auth, middleware-protected routes)
+2. ✅ Submit morning CBT
+3. ✅ Submit evening CBT
+4. ✅ Submit a workout
+5. ✅ Submit weight
+6. ✅ Submit hydration
+7. ✅ Sync Oura data (UI / API / CLI / cron)
+8. ✅ No duplicate Oura rows (upsert on user_id + date)
+9. ✅ View the dashboard
+10. ✅ See trend charts
+11. ✅ Generate a weekly review
+12. ✅ View correlations
+13. ✅ Deployable to Vercel (with daily cron)
+14. ✅ README explains every step
 
 ---
 
 ## Project structure
 
 ```
-src/
-  app.ts                 Express app (routes wired up)
-  server.ts              Boot server + start cron
-  config/env.ts          Validated env config
-  services/
-    airtable.ts          Create / update / upsert-by-date / list
-    oura.ts              Oura API v2 client + day sync
-    weeklyScorecard.ts   7-day aggregation
-  routes/                morning, evening, workout, weight, hydration,
-                         ouraSync, scorecard, exports, dashboard
-  schemas/               Zod schemas per form
-  utils/                 dates, csv, html helpers
-  cron/syncOuraDaily.ts  Daily Oura cron
-  scripts/               CLI entrypoints for sync:oura & scorecard
+app/
+  dashboard/ morning/ evening/ evening-shutdown/ daily-check-in/
+  workout/ weight/ hydration/ weekly-review/ correlations/
+  future-self/ settings/ login/
+  api/sync/oura/  api/generate-weekly-review/  auth/signout/
+components/
+  ui/         shadcn/ui primitives
+  forms/      FormShell, fields, morning + sentence-stems
+  charts/     Recharts trend chart + chart card
+  dashboard/  stat cards & progress bars
+  nav.tsx     page-header.tsx  sync-oura-button.tsx
+lib/
+  supabase/   client / server / admin / middleware
+  oura/       client + sync
+  analytics/  correlation, insights, weekly-review
+  validation/ Zod schemas
+  dates/      date helpers
+  actions.ts  server actions (all form submissions)
+  data.ts     dashboard data access
+supabase/
+  migrations/0001_init.sql
+scripts/
+  syncOura.ts  generateWeeklyReview.ts
 ```
