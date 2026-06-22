@@ -1,0 +1,39 @@
+{
+  "name": "personal-performance-dashboard",
+  "version": "1.0.0",
+  "description": "Personal performance dashboard connecting Oura, hydration, CBT, workouts and weight to Airtable, ready for Looker Studio.",
+  "main": "dist/server.js",
+  "engines": {
+    "node": ">=18"
+  },
+  "scripts": {
+    "dev": "nodemon --watch src --ext ts --exec \"ts-node src/server.ts\"",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/server.js",
+    "sync:oura": "ts-node src/scripts/syncOura.ts",
+    "scorecard": "ts-node src/scripts/generateScorecard.ts"
+  },
+  "keywords": [
+    "oura",
+    "airtable",
+    "cbt",
+    "dashboard",
+    "looker-studio"
+  ],
+  "license": "MIT",
+  "dependencies": {
+    "airtable": "^0.12.2",
+    "dotenv": "^16.4.5",
+    "express": "^4.19.2",
+    "node-cron": "^3.0.3",
+    "zod": "^3.23.8"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.21",
+    "@types/node": "^20.14.10",
+    "@types/node-cron": "^3.0.11",
+    "nodemon": "^3.1.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.5.3"
+  }
+}
