@@ -33,9 +33,10 @@ export default async function DashboardPage() {
           label="Stepping into"
           value={d.latestMorning?.identity_stepping_into ?? "—"}
           accent
+          compact
         />
         <StatCard label="Debt remaining" value={debtRemaining ? `$${debtRemaining.toLocaleString()}` : "—"} accent />
-        <StatCard label="Most important action" value={mostImportant ?? "—"} accent />
+        <StatCard label="Most important action" value={mostImportant ?? "—"} accent compact />
       </section>
 
       {/* ===== Core stats ===== */}

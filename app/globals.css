@@ -44,3 +44,13 @@ input[type="checkbox"] {
 select {
   @apply h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring;
 }
+
+/* On small screens, use a 16px font on form controls so mobile Safari
+   doesn't auto-zoom when a field is focused. */
+@media (max-width: 640px) {
+  input,
+  select,
+  textarea {
+    font-size: 16px;
+  }
+}

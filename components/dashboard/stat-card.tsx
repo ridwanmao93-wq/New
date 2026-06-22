@@ -8,18 +8,27 @@ export function StatCard({
   suffix,
   hint,
   accent,
+  compact,
 }: {
   label: string;
   value: string | number | null | undefined;
   suffix?: string;
   hint?: string;
   accent?: boolean;
+  /** For free-text values: smaller, wrapping text instead of a big number. */
+  compact?: boolean;
 }) {
   const display =
     value === null || value === undefined || value === "" ? "—" : `${value}${suffix ?? ""}`;
   return (
     <Card className={cn("p-4", accent && "border-primary/40 bg-primary/5")}>
-      <div className={cn("text-3xl font-bold tracking-tight", accent && "text-primary")}>
+      <div
+        className={cn(
+          "font-bold tracking-tight",
+          compact ? "line-clamp-3 text-base leading-snug" : "text-3xl",
+          accent && "text-primary"
+        )}
+      >
         {display}
       </div>
       <div className="mt-1 text-xs font-medium uppercase tracking-wide text-muted-foreground">
