@@ -18,7 +18,26 @@ export default async function DashboardPage() {
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const d = await getDashboardData(supabase, user.id);
+  let d: Awaited<ReturnType<typeof getDashboardData>>;
+  try {
+    d = await getDashboardData(supabase, user.id);
+  } catch (err) {
+    const message = err instanceof Error ? err.message : "Unknown error";
+    return (
+      <div className="space-y-4">
+        <PageHeader title="Command Center" subtitle="Couldn’t load your data" />
+        <Card>
+          <CardContent className="space-y-3 pt-6 text-sm">
+            <p className="text-red-400">⚠️ {message}</p>
+            <p className="text-muted-foreground">
+              If you just added a feature, make sure the latest SQL migrations have been run in
+              Supabase. Otherwise try again, or visit <Link className="text-primary underline" href="/api/health">/api/health</Link>.
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
 
   const debtRemaining = d.debt?.total_debt_remaining ?? null;
   const savings = d.debt?.savings_balance ?? null;
