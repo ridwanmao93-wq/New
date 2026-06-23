@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { today } from "@/lib/dates";
+import { momentumScore } from "@/lib/momentum";
 
 /** A 1–10 integer score. Coerces numeric strings from form posts. */
 export const scoreSchema = z.coerce
@@ -239,20 +240,7 @@ export const momentumSchema = z
     most_important_action: optionalText,
     notes: optionalText,
   })
-  .transform((d) => {
-    const items = [
-      d.morning_cbt_completed,
-      d.evening_cbt_completed,
-      d.workout_completed,
-      d.hydration_goal_hit,
-      d.no_cannabis,
-      d.family_connection_completed,
-      d.business_growth_action_completed,
-      d.hardest_thing_done,
-    ];
-    const done = items.filter(Boolean).length;
-    return { ...d, momentum_score: Math.round((done / items.length) * 100) };
-  });
+  .transform((d) => ({ ...d, momentum_score: momentumScore(d) }));
 export type MomentumInput = z.infer<typeof momentumSchema>;
 
 export const antiAvoidanceSchema = z.object({
@@ -301,3 +289,37 @@ export const FUTURE_SELF_CATEGORIES = [
   "Faith/Values",
   "Personal Growth",
 ] as const;
+
+/* ------------------------------------------------------------------ */
+/* Focus / deep work                                                   */
+/* ------------------------------------------------------------------ */
+
+export const focusSchema = z.object({
+  date: dateSchema,
+  minutes: z.coerce
+    .number({ invalid_type_error: "Minutes must be a number" })
+    .int("Minutes must be a whole number")
+    .positive("Log at least 1 minute"),
+  focus_area: optionalText,
+  notes: optionalText,
+});
+export type FocusInput = z.infer<typeof focusSchema>;
+
+/* ------------------------------------------------------------------ */
+/* Vision board                                                        */
+/* ------------------------------------------------------------------ */
+
+export const visionItemSchema = z.object({
+  image_url: z.string().url("A valid image (upload or URL) is required."),
+  caption: optionalText,
+  category: optionalText,
+  future_self_goal_id: z
+    .union([z.literal(""), z.string().uuid()])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? undefined : v)),
+  target_date: z
+    .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/)])
+    .optional()
+    .transform((v) => (v === "" ? undefined : v)),
+});
+export type VisionItemInput = z.infer<typeof visionItemSchema>;

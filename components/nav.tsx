@@ -10,9 +10,13 @@ import {
   Dumbbell,
   Scale,
   Droplets,
+  Timer,
+  Users,
+  Wallet,
   CalendarCheck,
   TrendingUp,
   Sparkles,
+  Image as ImageIcon,
   Settings,
   Menu,
   X,
@@ -21,15 +25,19 @@ import {
 import { cn } from "@/lib/utils";
 
 const items = [
-  { href: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
+  { href: "/dashboard", label: "Command Center", icon: LayoutDashboard },
   { href: "/morning", label: "Morning", icon: Sunrise },
   { href: "/evening", label: "Evening", icon: Moon },
+  { href: "/focus", label: "Focus", icon: Timer },
   { href: "/workout", label: "Workout", icon: Dumbbell },
   { href: "/weight", label: "Weight", icon: Scale },
   { href: "/hydration", label: "Hydration", icon: Droplets },
+  { href: "/relationships", label: "Relationships", icon: Users },
+  { href: "/debt", label: "Debt & Money", icon: Wallet },
   { href: "/weekly-review", label: "Weekly Review", icon: CalendarCheck },
   { href: "/correlations", label: "Correlations", icon: TrendingUp },
   { href: "/future-self", label: "Future Self", icon: Sparkles },
+  { href: "/vision-board", label: "Vision Board", icon: ImageIcon },
   { href: "/settings", label: "Settings", icon: Settings },
 ];
 
