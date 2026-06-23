@@ -36,7 +36,12 @@ export async function updateSession(request: NextRequest) {
   const isPublic =
     path.startsWith("/login") ||
     path.startsWith("/auth") ||
-    path.startsWith("/api"); // API routes do their own auth
+    path.startsWith("/api") || // API routes do their own auth
+    // PWA assets must be reachable without a session (install / SW fetch).
+    path === "/manifest.webmanifest" ||
+    path === "/sw.js" ||
+    path === "/apple-touch-icon.png" ||
+    path.startsWith("/icon-");
 
   if (!user && !isPublic) {
     const redirectUrl = request.nextUrl.clone();
