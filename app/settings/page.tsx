@@ -5,6 +5,7 @@ import { FormShell } from "@/components/forms/form-shell";
 import { Field, Input } from "@/components/forms/field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SyncOuraButton } from "@/components/sync-oura-button";
+import { EnablePush } from "@/components/notifications/enable-push";
 import { saveProfile } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
@@ -44,6 +45,19 @@ export default async function SettingsPage() {
               </select>
             </Field>
           </FormShell>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader className="pb-2">
+          <CardTitle className="text-base">Notifications</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          <EnablePush />
+          <p className="text-xs text-muted-foreground">
+            Get morning, midday and evening nudges on this device. On iPhone, add the app to your
+            Home Screen first, open it from the icon, then enable.
+          </p>
         </CardContent>
       </Card>
 

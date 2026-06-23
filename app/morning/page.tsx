@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { today } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
 import { MorningForm } from "@/components/forms/morning-form";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -13,6 +14,14 @@ export default async function MorningPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  // Already logged today?
+  const { count: morningCount } = await supabase
+    .from("cbt_morning_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("date", today());
+  const doneToday = (morningCount ?? 0) > 0;
 
   // A rotating vision image to anchor the morning "visualize" moment.
   const { data: vision } = await supabase
@@ -27,6 +36,16 @@ export default async function MorningPage() {
   return (
     <div>
       <PageHeader title="Morning Practice" subtitle="Center, rate, complete, and step into your identity." />
+
+      {doneToday ? (
+        <div className="mb-5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          ✅ You’ve already logged a morning entry today. You can add another, or review it in your{" "}
+          <Link href="/journal" className="underline">
+            Journal
+          </Link>
+          .
+        </div>
+      ) : null}
 
       {/* Visualize — 60-second look at your future self */}
       <Card className="mb-5 overflow-hidden border-primary/40">
