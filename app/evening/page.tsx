@@ -1,3 +1,4 @@
+import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { today } from "@/lib/dates";
@@ -28,9 +29,26 @@ export default async function EveningPage() {
     .maybeSingle();
   const hardestThing = aa?.hardest_thing_i_did_not_want_to_do ?? "";
 
+  const { count: eveningCount } = await supabase
+    .from("cbt_evening_entries")
+    .select("id", { count: "exact", head: true })
+    .eq("user_id", user.id)
+    .eq("date", today());
+  const doneToday = (eveningCount ?? 0) > 0;
+
   return (
     <div>
       <PageHeader title="Evening Practice" subtitle="Close the day gently. Nothing here is required." />
+
+      {doneToday ? (
+        <div className="mb-5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">
+          ✅ You’ve already logged an evening entry today. Add another or see it in your{" "}
+          <Link href="/journal" className="underline">
+            Journal
+          </Link>
+          .
+        </div>
+      ) : null}
       <FormShell action={saveEvening} submitLabel="Save evening">
         <DateField />
 
