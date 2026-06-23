@@ -58,6 +58,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     sobriety,
     avoidance,
     relationships,
+    focus,
   ] = await Promise.all([
     range(supabase, "oura_daily_metrics", userId, from30),
     range(supabase, "cbt_morning_entries", userId, from30),
@@ -70,6 +71,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     range(supabase, "sobriety_entries", userId, from30),
     range(supabase, "anti_avoidance_entries", userId, from30),
     range(supabase, "relationship_entries", userId, from30),
+    range(supabase, "focus_sessions", userId, from30),
   ]);
 
   // Debt: latest snapshot (no date filter).
@@ -80,10 +82,31 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     .order("date", { ascending: true });
   const debt = latest((debtRows ?? []) as Row[]);
 
+  // Vision board items (for the rotating "vision of the day").
+  const { data: visionRows } = await supabase
+    .from("vision_board_items")
+    .select("*")
+    .eq("user_id", userId)
+    .order("created_at", { ascending: true });
+  const vision = (visionRows ?? []) as Row[];
+
+  // Latest weekly review (for "this week's intentions" on the dashboard).
+  const { data: reviewRows } = await supabase
+    .from("weekly_reviews")
+    .select("intentions_for_next_week, week_start_date")
+    .eq("user_id", userId)
+    .order("week_start_date", { ascending: false })
+    .limit(1);
+  const latestIntentions = reviewRows?.[0]?.intentions_for_next_week ?? null;
+
   const td = today();
   const days7 = lastNDays(7);
   const days30 = lastNDays(30);
   const weekStart = days7[0];
+
+  // Pick one vision item that rotates by day so it changes daily.
+  const dayIndex = Math.floor(Date.parse(td + "T00:00:00Z") / 86400000);
+  const visionOfDay = vision.length ? vision[dayIndex % vision.length] : undefined;
 
   const find = (rows: Row[], d = td) => rows.find((r) => String(r.date) === d);
   const inWeek = (rows: Row[]) => rows.filter((r) => String(r.date) >= weekStart && String(r.date) <= td);
@@ -130,6 +153,66 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
   // Hydration % today
   const hydrationPctToday = find(hydration)?.hydration_goal_percentage ?? null;
 
+  // Focus / deep work.
+  const sumMinutes = (rows: Row[]) =>
+    rows.reduce((acc, r) => acc + (Number(r.minutes) || 0), 0);
+  const deepWorkToday = sumMinutes(focus.filter((r) => String(r.date) === td));
+  const deepWorkThisWeek = sumMinutes(inWeek(focus));
+
+  const workoutsThisWeek = inWeek(workouts).filter((r) => r.completed).length;
+  const relationshipTouchesThisWeek = inWeek(relationships).filter((r) => r.completed).length;
+  const hrvAvg = average(oura.map((r) => r.hrv));
+
+  // --- Just-in-time nudges (rule-based, surfaced at the top) ---
+  const nudges: { text: string; tone: "good" | "warn" | "info" }[] = [];
+  if (!todayMorning) {
+    nudges.push({ text: "You haven’t done your morning practice yet — set your one most important action.", tone: "warn" });
+  }
+  if (currentSoberStreak >= 2) {
+    nudges.push({ text: `🟢 ${currentSoberStreak}-day cannabis-free streak. Protect it tonight.`, tone: "good" });
+  }
+  if (sleepSober !== null && sleepCannabis !== null && sleepSober - sleepCannabis >= 2) {
+    nudges.push({
+      text: `On cannabis-free days your sleep score averages ${Math.round(sleepSober - sleepCannabis)} pts higher.`,
+      tone: "info",
+    });
+  }
+  if (latestOura?.hrv != null && hrvAvg != null && Number(latestOura.hrv) < hrvAvg * 0.85) {
+    nudges.push({ text: "HRV is below your recent average — consider a lighter day and an earlier night.", tone: "warn" });
+  }
+  if (relationshipTouchesThisWeek === 0) {
+    nudges.push({ text: "No relationship connections logged this week — reach out to someone today.", tone: "warn" });
+  }
+  if (workoutsThisWeek === 0) {
+    nudges.push({ text: "No workouts logged this week yet.", tone: "info" });
+  }
+  if (hydrationPctToday !== null && Number(hydrationPctToday) < 50) {
+    nudges.push({ text: `Hydration at ${hydrationPctToday}% of goal — top up.`, tone: "info" });
+  }
+  const topNudges = nudges.slice(0, 5);
+
+  // Relationships this week, broken down by person + date-night flag.
+  const relWeek = inWeek(relationships).filter((r) => r.completed);
+  const relByPerson: Record<string, number> = {};
+  for (const r of relWeek) {
+    const p = String(r.person ?? "Other");
+    relByPerson[p] = (relByPerson[p] ?? 0) + 1;
+  }
+  const dateNightThisMonth = relationships.some(
+    (r) => String(r.date) >= monthStart && /date/i.test(String(r.connection_type ?? ""))
+  );
+
+  // Debt-free projection: remaining ÷ monthly payment.
+  let debtFreeDate: string | null = null;
+  const remaining = Number(debt?.total_debt_remaining);
+  const monthly = Number(debt?.debt_paid_this_month);
+  if (Number.isFinite(remaining) && remaining > 0 && Number.isFinite(monthly) && monthly > 0) {
+    const months = Math.ceil(remaining / monthly);
+    const dfd = new Date();
+    dfd.setMonth(dfd.getMonth() + months);
+    debtFreeDate = dfd.toLocaleDateString("en-US", { month: "short", year: "numeric" });
+  }
+
   return {
     td,
     days7,
@@ -144,11 +227,19 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     latestWeight,
     latestHydration,
     hydrationPctToday,
+    deepWorkToday,
+    deepWorkThisWeek,
+    nudges: topNudges,
+    latestIntentions,
     // Top section
     currentSoberStreak,
     longestSoberStreak,
     cannabisFreeThisMonth,
     debt,
+    debtFreeDate,
+    relByPerson,
+    dateNightThisMonth,
+    visionOfDay,
     // Aggregates
     alignment7: average(inWeek(alignment).map((r) => r.daily_alignment_score)),
     alignment30: average(alignment.map((r) => r.daily_alignment_score)),

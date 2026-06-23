@@ -17,8 +17,11 @@ import {
   antiAvoidanceSchema,
   relationshipSchema,
   futureSelfGoalSchema,
+  visionItemSchema,
+  focusSchema,
 } from "@/lib/validation/schemas";
 import { generateWeeklyReview } from "@/lib/analytics/weekly-review";
+import { momentumScore } from "@/lib/momentum";
 
 /** Shape returned by every form action (consumed by useFormState). */
 export type ActionState = { ok: boolean; error?: string; message?: string };
@@ -331,3 +334,93 @@ export async function runWeeklyReview(
 // (saveMorning / saveEvening above). The separate /daily-check-in and
 // /evening-shutdown pages were removed in favour of the Morning and
 // Evening tabs.
+
+/* --------------------------- Vision board ------------------------ */
+
+export async function saveVisionItem(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = visionItemSchema.safeParse(formObject(formData));
+  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
+  return save("vision_board_items", parsed.data, {
+    revalidate: ["/vision-board", "/dashboard", "/morning"],
+  });
+}
+
+export async function deleteVisionItem(id: string): Promise<ActionState> {
+  try {
+    const { supabase, userId } = await requireUser();
+    const { error } = await supabase
+      .from("vision_board_items")
+      .delete()
+      .eq("id", id)
+      .eq("user_id", userId);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/vision-board");
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Removed." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+}
+
+/* ----------------------------- Focus ----------------------------- */
+
+export async function saveFocus(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = focusSchema.safeParse(formObject(formData));
+  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
+  return save("focus_sessions", parsed.data, { revalidate: ["/focus", "/dashboard"] });
+}
+
+/* ----------------- Today card quick toggles ---------------------- */
+
+export interface MomentumItems {
+  morning_cbt_completed: boolean;
+  evening_cbt_completed: boolean;
+  workout_completed: boolean;
+  hydration_goal_hit: boolean;
+  no_cannabis: boolean;
+  family_connection_completed: boolean;
+  business_growth_action_completed: boolean;
+  hardest_thing_done: boolean;
+}
+
+/** Tick momentum items straight from the dashboard; recomputes the score. */
+export async function updateMomentumToday(
+  date: string,
+  items: MomentumItems,
+  mostImportant?: string
+): Promise<ActionState> {
+  try {
+    const { supabase, userId } = await requireUser();
+    const score = momentumScore(items);
+    const { error } = await supabase.from("daily_momentum_entries").upsert(
+      {
+        user_id: userId,
+        date,
+        ...items,
+        most_important_action: mostImportant || undefined,
+        momentum_score: score,
+      },
+      { onConflict: "user_id,date" }
+    );
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Updated." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+}
+
+/** Toggle "did I do the hard thing" for the day from the dashboard. */
+export async function setHardThingDone(date: string, didIt: boolean): Promise<ActionState> {
+  try {
+    const { supabase, userId } = await requireUser();
+    const { error } = await supabase
+      .from("anti_avoidance_entries")
+      .upsert({ user_id: userId, date, did_i_do_it: didIt }, { onConflict: "user_id,date" });
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Updated." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+}
