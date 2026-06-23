@@ -1,20 +1,33 @@
 /**
  * Date helpers. Everything keys on ISO date strings (YYYY-MM-DD) so
  * records line up across tables and charts.
+ *
+ * "Today" is resolved in the app's timezone (default America/New_York)
+ * so the day rolls over at local midnight, not UTC midnight. Override
+ * with APP_TIMEZONE (e.g. "America/Los_Angeles").
  */
 
+const APP_TZ = process.env.APP_TIMEZONE || "America/New_York";
+
+/** UTC-based date string — used only for pure calendar arithmetic below. */
 export function toISODate(date: Date): string {
   return date.toISOString().slice(0, 10);
 }
 
+/** The current calendar date in the app's timezone. */
 export function today(): string {
-  return toISODate(new Date());
+  const parts = new Intl.DateTimeFormat("en-CA", {
+    timeZone: APP_TZ,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  }).formatToParts(new Date());
+  const get = (t: string) => parts.find((p) => p.type === t)?.value ?? "";
+  return `${get("year")}-${get("month")}-${get("day")}`;
 }
 
 export function yesterday(): string {
-  const d = new Date();
-  d.setUTCDate(d.getUTCDate() - 1);
-  return toISODate(d);
+  return addDays(today(), -1);
 }
 
 export function addDays(isoDate: string, days: number): string {
@@ -25,12 +38,9 @@ export function addDays(isoDate: string, days: number): string {
 
 /** Last `n` days as ISO strings, oldest first, ending today (inclusive). */
 export function lastNDays(n: number): string[] {
+  const end = today();
   const out: string[] = [];
-  for (let i = n - 1; i >= 0; i--) {
-    const d = new Date();
-    d.setUTCDate(d.getUTCDate() - i);
-    out.push(toISODate(d));
-  }
+  for (let i = n - 1; i >= 0; i--) out.push(addDays(end, -i));
   return out;
 }
 
