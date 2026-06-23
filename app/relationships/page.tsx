@@ -1,7 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
-import { lastNDays } from "@/lib/dates";
+import { lastNDays, today } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
+import { DoneTodayBanner } from "@/components/done-today-banner";
 import { FormShell } from "@/components/forms/form-shell";
 import { Field, DateField, CheckboxField, Input, Textarea } from "@/components/forms/field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,10 +28,17 @@ export default async function RelationshipsPage() {
     .gte("date", weekStart)
     .order("date", { ascending: false });
   const week = rows ?? [];
+  const todayCount = week.filter((r) => String(r.date) === today()).length;
 
   return (
     <div className="space-y-6">
       <PageHeader title="Relationships" subtitle="What gets measured gets attention. Log a connection." />
+
+      {todayCount > 0 ? (
+        <DoneTodayBanner>
+          You’ve logged {todayCount} connection{todayCount === 1 ? "" : "s"} today.
+        </DoneTodayBanner>
+      ) : null}
 
       <Card>
         <CardHeader className="pb-2">

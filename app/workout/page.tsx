@@ -1,4 +1,8 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { countToday } from "@/lib/today-count";
 import { PageHeader } from "@/components/page-header";
+import { DoneTodayBanner } from "@/components/done-today-banner";
 import { FormShell } from "@/components/forms/form-shell";
 import { Field, ScoreField, DateField, CheckboxField, Input, Textarea } from "@/components/forms/field";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,10 +10,22 @@ import { saveWorkout } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 
-export default function WorkoutPage() {
+export default async function WorkoutPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const n = await countToday(supabase, user.id, "workouts");
+
   return (
     <div>
       <PageHeader title="Log a Workout" subtitle="Track training type, intensity and consistency." />
+      {n > 0 ? (
+        <DoneTodayBanner>
+          You’ve logged {n} workout{n === 1 ? "" : "s"} today. You can add another.
+        </DoneTodayBanner>
+      ) : null}
       <FormShell action={saveWorkout} submitLabel="Save workout">
         <Card>
           <CardContent className="space-y-4 pt-6">
