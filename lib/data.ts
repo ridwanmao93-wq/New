@@ -15,7 +15,12 @@ async function range(supabase: SupabaseClient, table: string, userId: string, fr
     .eq("user_id", userId)
     .gte("date", fromDate)
     .order("date", { ascending: true });
-  if (error) throw new Error(`${table}: ${error.message}`);
+  // Degrade gracefully: a missing table (e.g. a migration not run yet)
+  // should never brick the whole dashboard — treat it as no data.
+  if (error) {
+    console.error(`data: ${table} query failed: ${error.message}`);
+    return [] as Row[];
+  }
   return (data ?? []) as Row[];
 }
 
