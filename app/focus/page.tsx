@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { lastNDays } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
 import { FocusTimer } from "@/components/focus/focus-timer";
+import { DoneTodayBanner } from "@/components/done-today-banner";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 
@@ -33,6 +34,10 @@ export default async function FocusPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Focus" subtitle="Deep work is the input that builds everything else." />
+
+      {minsToday > 0 ? (
+        <DoneTodayBanner>You’ve logged {minsToday} min of focus today. Keep going.</DoneTodayBanner>
+      ) : null}
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
         <StatCard label="Focus today" value={minsToday} suffix=" min" accent />

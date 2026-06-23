@@ -1,6 +1,8 @@
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
+import { today } from "@/lib/dates";
 import { PageHeader } from "@/components/page-header";
+import { DoneTodayBanner } from "@/components/done-today-banner";
 import { FormShell } from "@/components/forms/form-shell";
 import { Field, DateField, Input, Textarea } from "@/components/forms/field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -27,6 +29,10 @@ export default async function DebtPage() {
   return (
     <div className="space-y-6">
       <PageHeader title="Debt & Money" subtitle="Update your numbers whenever they change — weekly is plenty." />
+
+      {latest && String(latest.date) === today() ? (
+        <DoneTodayBanner>You’ve already updated your numbers today.</DoneTodayBanner>
+      ) : null}
 
       {latest ? (
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

@@ -1,4 +1,8 @@
+import { redirect } from "next/navigation";
+import { createClient } from "@/lib/supabase/server";
+import { countToday } from "@/lib/today-count";
 import { PageHeader } from "@/components/page-header";
+import { DoneTodayBanner } from "@/components/done-today-banner";
 import { FormShell } from "@/components/forms/form-shell";
 import { Field, DateField, Input, Textarea } from "@/components/forms/field";
 import { Card, CardContent } from "@/components/ui/card";
@@ -6,10 +10,18 @@ import { saveWeight } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
 
-export default function WeightPage() {
+export default async function WeightPage() {
+  const supabase = createClient();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+  if (!user) redirect("/login");
+  const n = await countToday(supabase, user.id, "weight_entries");
+
   return (
     <div>
       <PageHeader title="Weight & Progress" subtitle="Default unit is lbs." />
+      {n > 0 ? <DoneTodayBanner>You’ve already recorded your weight today.</DoneTodayBanner> : null}
       <FormShell action={saveWeight} submitLabel="Save weight">
         <Card>
           <CardContent className="space-y-4 pt-6">
