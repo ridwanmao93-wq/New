@@ -215,11 +215,23 @@ export async function saveWorkout(_prev: ActionState, formData: FormData): Promi
   const parsed = workoutSchema.safeParse(formObject(formData));
   if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
   const d = parsed.data;
+  // Prefer structured set/weight data; fall back to free text.
+  let exercisesJson: unknown = d.exercises ? { raw: d.exercises } : null;
+  if (d.exercises_data) {
+    try {
+      const parsedData = JSON.parse(d.exercises_data);
+      if (parsedData && Array.isArray(parsedData.exercises) && parsedData.exercises.length > 0) {
+        exercisesJson = parsedData;
+      }
+    } catch {
+      /* keep fallback */
+    }
+  }
   return save("workouts", {
     date: d.date,
     workout_type: d.workout_type,
     duration_minutes: d.duration_minutes,
-    exercises_json: d.exercises ? { raw: d.exercises } : null,
+    exercises_json: exercisesJson,
     intensity_score: d.intensity_score,
     completed: d.completed,
     notes: d.notes,
