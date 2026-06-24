@@ -18,6 +18,7 @@ export function EnablePush() {
   const [status, setStatus] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [iosNeedsInstall, setIosNeedsInstall] = useState(false);
+  const [testing, setTesting] = useState(false);
 
   useEffect(() => {
     const ok = "serviceWorker" in navigator && "PushManager" in window && "Notification" in window;
@@ -78,6 +79,24 @@ export function EnablePush() {
     }
   }
 
+  async function sendTest() {
+    setTesting(true);
+    setStatus(null);
+    try {
+      const res = await fetch("/api/push/test", { method: "POST" });
+      const json = await res.json();
+      if (json.ok) {
+        setStatus(`✅ Test sent to ${json.sent} device(s). Check your notifications.`);
+      } else {
+        setStatus(`⚠️ ${json.error}`);
+      }
+    } catch (err) {
+      setStatus(`⚠️ ${err instanceof Error ? err.message : "Test failed"}`);
+    } finally {
+      setTesting(false);
+    }
+  }
+
   if (supported === false) {
     return (
       <p className="text-sm text-muted-foreground">
@@ -96,9 +115,14 @@ export function EnablePush() {
         </p>
       ) : null}
 
-      <Button onClick={enable} disabled={loading}>
-        {loading ? "Enabling…" : subscribed ? "Re-enable notifications" : "Enable notifications"}
-      </Button>
+      <div className="flex flex-wrap gap-2">
+        <Button onClick={enable} disabled={loading}>
+          {loading ? "Enabling…" : subscribed ? "Re-enable notifications" : "Enable notifications"}
+        </Button>
+        <Button variant="outline" onClick={sendTest} disabled={testing}>
+          {testing ? "Sending…" : "Send test notification"}
+        </Button>
+      </div>
 
       {subscribed ? (
         <p className="text-sm text-emerald-400">Notifications are on for this device.</p>
