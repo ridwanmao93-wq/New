@@ -89,7 +89,8 @@ export const workoutSchema = z.object({
     .union([z.literal(""), z.coerce.number().min(0)])
     .optional()
     .transform((v) => (v === "" || v === undefined ? undefined : v)),
-  exercises: optionalText, // free-form: "Bench 3x5 @ 135; Squat 3x5 @ 185"
+  exercises: optionalText, // free-form fallback
+  exercises_data: optionalText, // JSON string of structured sets/weights
   intensity_score: z
     .union([z.literal(""), scoreSchema])
     .optional()
