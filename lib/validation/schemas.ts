@@ -292,6 +292,16 @@ export const FUTURE_SELF_CATEGORIES = [
 ] as const;
 
 /* ------------------------------------------------------------------ */
+/* Brain dump / free-form journal                                      */
+/* ------------------------------------------------------------------ */
+
+export const brainDumpSchema = z.object({
+  date: dateSchema,
+  content: z.string().trim().min(1, "Write something first"),
+});
+export type BrainDumpInput = z.infer<typeof brainDumpSchema>;
+
+/* ------------------------------------------------------------------ */
 /* Focus / deep work                                                   */
 /* ------------------------------------------------------------------ */
 

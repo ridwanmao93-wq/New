@@ -19,6 +19,7 @@ import {
   futureSelfGoalSchema,
   visionItemSchema,
   focusSchema,
+  brainDumpSchema,
 } from "@/lib/validation/schemas";
 import { generateWeeklyReview } from "@/lib/analytics/weekly-review";
 import { momentumScore } from "@/lib/momentum";
@@ -369,6 +370,26 @@ export async function deleteVisionItem(id: string): Promise<ActionState> {
     revalidatePath("/vision-board");
     revalidatePath("/dashboard");
     return { ok: true, message: "Removed." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+}
+
+/* --------------------------- Brain dump -------------------------- */
+
+export async function saveBrainDump(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = brainDumpSchema.safeParse(formObject(formData));
+  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
+  return save("brain_dumps", parsed.data, { revalidate: ["/brain-dump"] });
+}
+
+export async function deleteBrainDump(id: string): Promise<ActionState> {
+  try {
+    const { supabase, userId } = await requireUser();
+    const { error } = await supabase.from("brain_dumps").delete().eq("id", id).eq("user_id", userId);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/brain-dump");
+    return { ok: true, message: "Deleted." };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
   }
