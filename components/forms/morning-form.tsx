@@ -90,6 +90,7 @@ export function MorningForm() {
           <CheckboxField name="family_connection_completed" label="Family connection" />
           <CheckboxField name="business_growth_action_completed" label="Business growth action" />
           <CheckboxField name="hardest_thing_done" label="Do the hardest thing" />
+          <CheckboxField name="meditation_completed" label="Meditation" />
         </CardContent>
       </Card>
 

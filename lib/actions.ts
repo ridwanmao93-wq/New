@@ -19,6 +19,7 @@ import {
   futureSelfGoalSchema,
   visionItemSchema,
   focusSchema,
+  meditationSchema,
   brainDumpSchema,
 } from "@/lib/validation/schemas";
 import { generateWeeklyReview } from "@/lib/analytics/weekly-review";
@@ -127,6 +128,7 @@ export async function saveMorning(_prev: ActionState, formData: FormData): Promi
           family_connection_completed: d.family_connection_completed,
           business_growth_action_completed: d.business_growth_action_completed,
           hardest_thing_done: d.hardest_thing_done,
+          meditation_completed: d.meditation_completed,
           most_important_action: d.most_important_action,
           momentum_score: d.momentum_score,
         },
@@ -403,6 +405,14 @@ export async function saveFocus(_prev: ActionState, formData: FormData): Promise
   return save("focus_sessions", parsed.data, { revalidate: ["/focus", "/dashboard"] });
 }
 
+/* --------------------------- Meditation -------------------------- */
+
+export async function saveMeditation(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = meditationSchema.safeParse(formObject(formData));
+  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
+  return save("meditation_sessions", parsed.data, { revalidate: ["/meditation", "/dashboard"] });
+}
+
 /* ----------------- Today card quick toggles ---------------------- */
 
 export interface MomentumItems {
@@ -414,6 +424,7 @@ export interface MomentumItems {
   family_connection_completed: boolean;
   business_growth_action_completed: boolean;
   hardest_thing_done: boolean;
+  meditation_completed: boolean;
 }
 
 /** Tick momentum items straight from the dashboard; recomputes the score. */

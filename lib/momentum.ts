@@ -14,6 +14,7 @@ export const MOMENTUM_WEIGHTS = {
   evening_cbt_completed: 10,
   family_connection_completed: 5,
   hydration_goal_hit: 5,
+  meditation_completed: 5,
 } as const;
 
 export type MomentumKey = keyof typeof MOMENTUM_WEIGHTS;
@@ -27,6 +28,7 @@ export const MOMENTUM_ITEMS: { key: MomentumKey; label: string }[] = [
   { key: "evening_cbt_completed", label: "Evening CBT" },
   { key: "family_connection_completed", label: "Family connection" },
   { key: "hydration_goal_hit", label: "Hydration" },
+  { key: "meditation_completed", label: "Meditation" },
 ];
 
 const TOTAL_WEIGHT = Object.values(MOMENTUM_WEIGHTS).reduce((a, b) => a + b, 0);

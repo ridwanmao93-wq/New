@@ -170,6 +170,7 @@ export default async function DashboardPage() {
           <StatCard label="HRV" value={d.latestOura?.hrv} />
           <StatCard label="Resting HR" value={d.latestOura?.resting_heart_rate} />
           <StatCard label="Focus (wk)" value={d.deepWorkThisWeek} suffix="m" />
+          <StatCard label="Meditation (wk)" value={d.meditationThisWeek} suffix="m" />
         </div>
       </section>
 

@@ -18,6 +18,7 @@ function emptyItems(): MomentumItems {
     family_connection_completed: false,
     business_growth_action_completed: false,
     hardest_thing_done: false,
+    meditation_completed: false,
   };
 }
 
