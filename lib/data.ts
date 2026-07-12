@@ -64,6 +64,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     avoidance,
     relationships,
     focus,
+    meditation,
   ] = await Promise.all([
     range(supabase, "oura_daily_metrics", userId, from30),
     range(supabase, "cbt_morning_entries", userId, from30),
@@ -77,6 +78,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     range(supabase, "anti_avoidance_entries", userId, from30),
     range(supabase, "relationship_entries", userId, from30),
     range(supabase, "focus_sessions", userId, from30),
+    range(supabase, "meditation_sessions", userId, from30),
   ]);
 
   // Debt: latest snapshot (no date filter).
@@ -163,6 +165,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     rows.reduce((acc, r) => acc + (Number(r.minutes) || 0), 0);
   const deepWorkToday = sumMinutes(focus.filter((r) => String(r.date) === td));
   const deepWorkThisWeek = sumMinutes(inWeek(focus));
+  const meditationThisWeek = sumMinutes(inWeek(meditation));
 
   const workoutsThisWeek = inWeek(workouts).filter((r) => r.completed).length;
   const relationshipTouchesThisWeek = inWeek(relationships).filter((r) => r.completed).length;
@@ -234,6 +237,7 @@ export async function getDashboardData(supabase: SupabaseClient, userId: string)
     hydrationPctToday,
     deepWorkToday,
     deepWorkThisWeek,
+    meditationThisWeek,
     nudges: topNudges,
     latestIntentions,
     // Top section

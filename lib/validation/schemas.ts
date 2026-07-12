@@ -238,6 +238,7 @@ export const momentumSchema = z
     family_connection_completed: bool,
     business_growth_action_completed: bool,
     hardest_thing_done: bool,
+    meditation_completed: bool,
     most_important_action: optionalText,
     notes: optionalText,
   })
@@ -315,6 +316,16 @@ export const focusSchema = z.object({
   notes: optionalText,
 });
 export type FocusInput = z.infer<typeof focusSchema>;
+
+export const meditationSchema = z.object({
+  date: dateSchema,
+  minutes: z.coerce
+    .number({ invalid_type_error: "Minutes must be a number" })
+    .int("Minutes must be a whole number")
+    .positive("Log at least 1 minute"),
+  notes: optionalText,
+});
+export type MeditationInput = z.infer<typeof meditationSchema>;
 
 /* ------------------------------------------------------------------ */
 /* Vision board                                                        */
