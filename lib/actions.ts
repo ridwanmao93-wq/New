@@ -154,6 +154,7 @@ export async function saveMorning(_prev: ActionState, formData: FormData): Promi
     }
 
     revalidatePath("/dashboard");
+    revalidatePath("/morning");
     return { ok: true, message: "Morning routine saved. Go make it a great day." };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
@@ -206,6 +207,7 @@ export async function saveEvening(_prev: ActionState, formData: FormData): Promi
     }
 
     revalidatePath("/dashboard");
+    revalidatePath("/evening");
     return { ok: true, message: "Evening saved. Rest well." };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
