@@ -5,6 +5,7 @@ import { getDashboardData } from "@/lib/data";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { TodayPanel } from "@/components/dashboard/today-panel";
+import { QuickCheckIn } from "@/components/dashboard/quick-check-in";
 import { ChartCard } from "@/components/charts/chart-card";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -48,6 +49,18 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader title="Command Center" subtitle={`What matters today · ${d.td}`} />
+
+      {/* ===== 30-second check-in — the floor, first thing you see ===== */}
+      <QuickCheckIn
+        date={d.td}
+        hardThing={
+          d.todayAvoidance?.hardest_thing_i_did_not_want_to_do ??
+          d.todayMomentum?.most_important_action ??
+          undefined
+        }
+        didIt={d.todayAvoidance?.did_i_do_it ?? false}
+        momentum={d.todayMomentum}
+      />
 
       {/* ===== Nudges — surfaced at the very top ===== */}
       {d.nudges.length ? (
