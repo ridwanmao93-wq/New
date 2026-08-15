@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
+  CircleCheck,
   Sunrise,
   Moon,
   Dumbbell,
@@ -28,6 +29,7 @@ import {
 import { cn } from "@/lib/utils";
 
 const items = [
+  { href: "/today", label: "Today · 30-sec", icon: CircleCheck },
   { href: "/dashboard", label: "Command Center", icon: LayoutDashboard },
   { href: "/morning", label: "Morning", icon: Sunrise },
   { href: "/evening", label: "Evening", icon: Moon },

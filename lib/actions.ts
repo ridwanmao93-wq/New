@@ -465,7 +465,40 @@ export async function setHardThingDone(date: string, didIt: boolean): Promise<Ac
       .upsert({ user_id: userId, date, did_i_do_it: didIt }, { onConflict: "user_id,date" });
     if (error) return { ok: false, error: error.message };
     revalidatePath("/dashboard");
+    revalidatePath("/today");
     return { ok: true, message: "Updated." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+}
+
+/**
+ * Set today's one hard thing in a single tap (from the 30-second check-in).
+ * Writes it as both the anti-avoidance "hardest thing" and the momentum
+ * "most important action" so it shows up everywhere the mission does.
+ */
+export async function setTodayFocus(date: string, text: string): Promise<ActionState> {
+  const focus = text.trim();
+  if (!focus) return { ok: false, error: "Say what the one hard thing is." };
+  try {
+    const { supabase, userId } = await requireUser();
+
+    const aa = await supabase.from("anti_avoidance_entries").upsert(
+      { user_id: userId, date, hardest_thing_i_did_not_want_to_do: focus },
+      { onConflict: "user_id,date" }
+    );
+    if (aa.error) return { ok: false, error: aa.error.message };
+
+    const mom = await supabase.from("daily_momentum_entries").upsert(
+      { user_id: userId, date, most_important_action: focus },
+      { onConflict: "user_id,date" }
+    );
+    if (mom.error) return { ok: false, error: mom.error.message };
+
+    revalidatePath("/dashboard");
+    revalidatePath("/today");
+    revalidatePath("/morning");
+    return { ok: true, message: "Locked in." };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
   }
