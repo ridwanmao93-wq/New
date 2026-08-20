@@ -2,6 +2,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { createClient } from "@/lib/supabase/server";
 import { getDashboardData } from "@/lib/data";
+import { checkDbStatus } from "@/lib/db-status";
 import { PageHeader } from "@/components/page-header";
 import { StatCard } from "@/components/dashboard/stat-card";
 import { TodayPanel } from "@/components/dashboard/today-panel";
@@ -18,6 +19,8 @@ export default async function DashboardPage() {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) redirect("/login");
+
+  const dbStatus = await checkDbStatus(supabase).catch(() => ({ missing: [], upToDate: true }));
 
   let d: Awaited<ReturnType<typeof getDashboardData>>;
   try {
@@ -49,6 +52,21 @@ export default async function DashboardPage() {
   return (
     <div className="space-y-8">
       <PageHeader title="Command Center" subtitle={`What matters today · ${d.td}`} />
+
+      {/* ===== Calm database-update notice (never blocks anything) ===== */}
+      {dbStatus.missing.length ? (
+        <Link
+          href="/system"
+          className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-2.5 text-sm text-amber-200 hover:bg-amber-500/15"
+        >
+          <span>
+            {dbStatus.missing.length}{" "}
+            {dbStatus.missing.length === 1 ? "feature is" : "features are"} waiting on a quick
+            database update. Your saves still work.
+          </span>
+          <span className="shrink-0 font-medium">Fix it →</span>
+        </Link>
+      ) : null}
 
       {/* ===== 30-second check-in — the floor, first thing you see ===== */}
       <QuickCheckIn

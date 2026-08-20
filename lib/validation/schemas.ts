@@ -328,6 +328,16 @@ export const meditationSchema = z.object({
 export type MeditationInput = z.infer<typeof meditationSchema>;
 
 /* ------------------------------------------------------------------ */
+/* Tasks (work + personal to-do)                                       */
+/* ------------------------------------------------------------------ */
+
+export const taskSchema = z.object({
+  title: z.string().trim().min(1, "Give the task a title").max(300, "Keep it under 300 characters"),
+  category: z.enum(["work", "personal"], { invalid_type_error: "Pick work or personal" }),
+});
+export type TaskInput = z.infer<typeof taskSchema>;
+
+/* ------------------------------------------------------------------ */
 /* Vision board                                                        */
 /* ------------------------------------------------------------------ */
 

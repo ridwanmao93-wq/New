@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import {
   LayoutDashboard,
   CircleCheck,
+  ListChecks,
   Sunrise,
   Moon,
   Dumbbell,
@@ -22,6 +23,7 @@ import {
   Brain,
   Flower2,
   Settings,
+  Activity,
   Menu,
   X,
   LogOut,
@@ -31,6 +33,7 @@ import { cn } from "@/lib/utils";
 const items = [
   { href: "/today", label: "Today · 30-sec", icon: CircleCheck },
   { href: "/dashboard", label: "Command Center", icon: LayoutDashboard },
+  { href: "/tasks", label: "Tasks", icon: ListChecks },
   { href: "/morning", label: "Morning", icon: Sunrise },
   { href: "/evening", label: "Evening", icon: Moon },
   { href: "/journal", label: "Journal", icon: BookOpen },
@@ -47,6 +50,7 @@ const items = [
   { href: "/future-self", label: "Future Self", icon: Sparkles },
   { href: "/vision-board", label: "Vision Board", icon: ImageIcon },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/system", label: "System status", icon: Activity },
 ];
 
 export function Nav() {
