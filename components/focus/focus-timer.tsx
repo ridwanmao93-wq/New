@@ -1,62 +1,46 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { saveFocus, type ActionState } from "@/lib/actions";
+import { useFocusTimer } from "@/components/focus/focus-timer-provider";
+import { type ActionState } from "@/lib/actions";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 
-function fmt(totalSeconds: number) {
-  const m = Math.floor(totalSeconds / 60);
-  const s = totalSeconds % 60;
-  return `${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
+function fmt(total: number) {
+  const h = Math.floor(total / 3600);
+  const m = Math.floor((total % 3600) / 60);
+  const s = total % 60;
+  const mm = String(m).padStart(2, "0");
+  const ss = String(s).padStart(2, "0");
+  return h > 0 ? `${h}:${mm}:${ss}` : `${mm}:${ss}`;
 }
 
 /**
- * A deep-work timer. Start it, work, then log the session. Minutes are
- * auto-filled from the timer but stay editable (so you can also log a
- * block you already did).
+ * The Focus-page timer. It drives the SHARED global timer (from
+ * FocusTimerProvider), so once you start it you can navigate anywhere in the
+ * dashboard and a floating timer keeps counting. Minutes auto-fill from the
+ * clock but stay editable so you can also log a block you already did.
  */
 export function FocusTimer() {
   const router = useRouter();
-  const [seconds, setSeconds] = useState(0);
-  const [running, setRunning] = useState(false);
-  const [minutes, setMinutes] = useState("");
-  const [focusArea, setFocusArea] = useState("");
+  const { running, elapsed, active, focusArea, start, pause, resume, reset, setFocusArea, logSession } =
+    useFocusTimer();
+
+  const [minutesOverride, setMinutesOverride] = useState("");
   const [status, setStatus] = useState<ActionState | null>(null);
   const [saving, setSaving] = useState(false);
-  const timer = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  useEffect(() => {
-    if (running) {
-      timer.current = setInterval(() => setSeconds((s) => s + 1), 1000);
-    }
-    return () => {
-      if (timer.current) clearInterval(timer.current);
-    };
-  }, [running]);
-
-  // Keep the minutes field synced with the running timer until edited.
-  useEffect(() => {
-    if (running) setMinutes(String(Math.max(1, Math.round(seconds / 60))));
-  }, [seconds, running]);
-
-  async function logSession() {
+  async function log() {
     setSaving(true);
     setStatus(null);
-    const mins = parseInt(minutes || "0", 10) || Math.max(1, Math.round(seconds / 60));
-    const data = new FormData();
-    data.set("minutes", String(mins));
-    if (focusArea) data.set("focus_area", focusArea);
-    const result = await saveFocus({ ok: false }, data);
+    const override = minutesOverride.trim() ? parseInt(minutesOverride, 10) : undefined;
+    const result = await logSession(Number.isFinite(override as number) ? override : undefined);
     setStatus(result);
     setSaving(false);
     if (result.ok) {
-      setRunning(false);
-      setSeconds(0);
-      setMinutes("");
-      setFocusArea("");
+      setMinutesOverride("");
       router.refresh();
     }
   }
@@ -64,22 +48,26 @@ export function FocusTimer() {
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <div className="font-mono text-5xl font-bold tabular-nums">{fmt(seconds)}</div>
+        <div className="font-mono text-5xl font-bold tabular-nums">{fmt(elapsed)}</div>
         <div className="mt-3 flex justify-center gap-2">
-          <Button type="button" onClick={() => setRunning((r) => !r)} variant={running ? "secondary" : "default"}>
-            {running ? "Pause" : seconds === 0 ? "Start" : "Resume"}
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            onClick={() => {
-              setRunning(false);
-              setSeconds(0);
-            }}
-          >
+          {running ? (
+            <Button type="button" onClick={pause} variant="secondary">
+              Pause
+            </Button>
+          ) : (
+            <Button type="button" onClick={() => (active ? resume() : start())}>
+              {active ? "Resume" : "Start"}
+            </Button>
+          )}
+          <Button type="button" variant="outline" onClick={reset} disabled={!active}>
             Reset
           </Button>
         </div>
+        {active ? (
+          <p className="mt-2 text-xs text-muted-foreground">
+            The timer keeps running while you move around — look for it floating in the corner.
+          </p>
+        ) : null}
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
@@ -93,14 +81,14 @@ export function FocusTimer() {
           />
         </div>
         <div className="space-y-1.5">
-          <Label htmlFor="minutes">Minutes</Label>
+          <Label htmlFor="minutes">Minutes to log</Label>
           <Input
             id="minutes"
             type="number"
             min={1}
-            value={minutes}
-            onChange={(e) => setMinutes(e.target.value)}
-            placeholder="e.g. 50"
+            value={minutesOverride}
+            onChange={(e) => setMinutesOverride(e.target.value)}
+            placeholder={elapsed > 0 ? String(Math.max(1, Math.round(elapsed / 60))) : "e.g. 50"}
           />
         </div>
       </div>
@@ -112,7 +100,7 @@ export function FocusTimer() {
         <p className="rounded-md bg-destructive/15 px-4 py-2.5 text-sm text-red-400">⚠️ {status.error}</p>
       ) : null}
 
-      <Button type="button" onClick={logSession} disabled={saving} size="lg" className="w-full sm:w-auto">
+      <Button type="button" onClick={log} disabled={saving} size="lg" className="w-full sm:w-auto">
         {saving ? "Logging…" : "Log session"}
       </Button>
     </div>

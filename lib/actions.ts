@@ -21,6 +21,7 @@ import {
   focusSchema,
   meditationSchema,
   brainDumpSchema,
+  taskSchema,
 } from "@/lib/validation/schemas";
 import { generateWeeklyReview } from "@/lib/analytics/weekly-review";
 import { momentumScore } from "@/lib/momentum";
@@ -503,6 +504,48 @@ export async function saveMeditation(_prev: ActionState, formData: FormData): Pr
   const parsed = meditationSchema.safeParse(formObject(formData));
   if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
   return save("meditation_sessions", parsed.data, { revalidate: ["/meditation", "/dashboard"] });
+}
+
+/* ------------------------------ Tasks ---------------------------- */
+
+export async function addTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = taskSchema.safeParse(formObject(formData));
+  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
+  return save(
+    "tasks",
+    { title: parsed.data.title, category: parsed.data.category },
+    { revalidate: ["/tasks", "/dashboard"] }
+  );
+}
+
+export async function toggleTask(id: string, completed: boolean): Promise<ActionState> {
+  try {
+    const { supabase, userId } = await requireUser();
+    const { error } = await supabase
+      .from("tasks")
+      .update({ completed, completed_at: completed ? new Date().toISOString() : null })
+      .eq("id", id)
+      .eq("user_id", userId);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Updated." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+}
+
+export async function deleteTask(id: string): Promise<ActionState> {
+  try {
+    const { supabase, userId } = await requireUser();
+    const { error } = await supabase.from("tasks").delete().eq("id", id).eq("user_id", userId);
+    if (error) return { ok: false, error: error.message };
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Deleted." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
 }
 
 /* ----------------- Today card quick toggles ---------------------- */
