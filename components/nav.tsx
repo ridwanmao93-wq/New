@@ -22,6 +22,7 @@ import {
   Brain,
   Flower2,
   Settings,
+  Activity,
   Menu,
   X,
   LogOut,
@@ -47,6 +48,7 @@ const items = [
   { href: "/future-self", label: "Future Self", icon: Sparkles },
   { href: "/vision-board", label: "Vision Board", icon: ImageIcon },
   { href: "/settings", label: "Settings", icon: Settings },
+  { href: "/system", label: "System status", icon: Activity },
 ];
 
 export function Nav() {

@@ -43,9 +43,69 @@ function zodMessage(err: z.ZodError): string {
   return err.issues.map((i) => `${i.path.join(".") || "field"}: ${i.message}`).join(" · ");
 }
 
+type SupabaseLike = Awaited<ReturnType<typeof requireUser>>["supabase"];
+
+/** Outcome of a resilient write: ok, a missing table, or a real error. */
+type WriteResult = { ok: true } | { ok: false; missingTable: boolean; message: string };
+
+/**
+ * Self-healing insert/upsert. When the database is behind on migrations,
+ * PostgREST rejects the write with either:
+ *   - "Could not find the 'X' column of 'table' in the schema cache", or
+ *   - "Could not find the table 'public.table' in the schema cache".
+ *
+ * Rather than failing the whole save, we strip any column the schema
+ * doesn't have and retry, so the row still persists with whatever columns
+ * DO exist. A genuinely missing table can't be recovered by stripping, so
+ * it's reported back (callers decide whether that's fatal or skippable).
+ */
+async function writeRow(
+  supabase: SupabaseLike,
+  table: string,
+  row: Record<string, unknown>,
+  opts: { conflict?: string } = {}
+): Promise<WriteResult> {
+  let payload: Record<string, unknown> = { ...row };
+  const droppedColumns: string[] = [];
+  // Each pass can strip at most one column; bound the loop by column count.
+  for (let attempt = 0; attempt <= Object.keys(row).length; attempt++) {
+    const query = opts.conflict
+      ? supabase.from(table).upsert(payload, { onConflict: opts.conflict })
+      : supabase.from(table).insert(payload);
+    const { error } = await query;
+    if (!error) {
+      if (droppedColumns.length) {
+        console.warn(`writeRow: ${table} saved without missing column(s): ${droppedColumns.join(", ")}`);
+      }
+      return { ok: true };
+    }
+
+    // Whole table missing — stripping columns won't help.
+    if (/Could not find the table/i.test(error.message)) {
+      return { ok: false, missingTable: true, message: error.message };
+    }
+
+    // A single missing column — drop it and retry with the rest.
+    const m = error.message.match(/Could not find the '([^']+)' column/i);
+    if (m && m[1] && m[1] in payload) {
+      const col = m[1];
+      const { [col]: _removed, ...rest } = payload;
+      payload = rest;
+      droppedColumns.push(col);
+      continue;
+    }
+
+    // Anything else is a real error worth surfacing.
+    return { ok: false, missingTable: false, message: error.message };
+  }
+  return { ok: false, missingTable: false, message: "Too many missing columns to recover." };
+}
+
 /**
  * Generic insert/upsert helper. `conflict` enables upsert-by-date for
- * tables with a unique (user_id, date) constraint.
+ * tables with a unique (user_id, date) constraint. Self-heals around
+ * columns the database is missing; a missing table returns a friendly
+ * "needs a database update" message instead of a raw schema-cache error.
  */
 async function save(
   table: string,
@@ -54,12 +114,15 @@ async function save(
 ): Promise<ActionState> {
   try {
     const { supabase, userId } = await requireUser();
-    const row = { ...fields, user_id: userId };
-    const query = opts.conflict
-      ? supabase.from(table).upsert(row, { onConflict: opts.conflict })
-      : supabase.from(table).insert(row);
-    const { error } = await query;
-    if (error) return { ok: false, error: error.message };
+    const res = await writeRow(supabase, table, { ...fields, user_id: userId }, { conflict: opts.conflict });
+    if (!res.ok) {
+      return {
+        ok: false,
+        error: res.missingTable
+          ? "This feature needs a one-time database update before it can save. Run the latest SQL in Supabase → SQL Editor and try again."
+          : res.message,
+      };
+    }
     for (const path of opts.revalidate ?? ["/dashboard"]) revalidatePath(path);
     return { ok: true, message: "Saved." };
   } catch (e) {
@@ -95,7 +158,9 @@ export async function saveMorning(_prev: ActionState, formData: FormData): Promi
   try {
     const { supabase, userId } = await requireUser();
 
-    const cbtRes = await supabase.from("cbt_morning_entries").insert({
+    // Primary write — the morning CBT entry. Self-heals around any column
+    // the database is missing; only a missing table is fatal here.
+    const cbtRes = await writeRow(supabase, "cbt_morning_entries", {
       user_id: userId,
       date: m.date,
       mood_score: m.mood_score,
@@ -111,12 +176,22 @@ export async function saveMorning(_prev: ActionState, formData: FormData): Promi
       affirmation_completed: m.affirmation_completed,
       notes: m.notes,
     });
-    if (cbtRes.error) return { ok: false, error: cbtRes.error.message };
+    if (!cbtRes.ok) {
+      return {
+        ok: false,
+        error: cbtRes.missingTable
+          ? "Your database needs a one-time update before the morning practice can save. Run the latest SQL in Supabase → SQL Editor."
+          : cbtRes.message,
+      };
+    }
 
     // Momentum (commit to today's items + most important action).
+    // Auxiliary: a missing table here shouldn't block the CBT save.
     if (mom.success) {
       const d = mom.data;
-      const momRes = await supabase.from("daily_momentum_entries").upsert(
+      const momRes = await writeRow(
+        supabase,
+        "daily_momentum_entries",
         {
           user_id: userId,
           date: d.date,
@@ -132,15 +207,18 @@ export async function saveMorning(_prev: ActionState, formData: FormData): Promi
           most_important_action: d.most_important_action,
           momentum_score: d.momentum_score,
         },
-        { onConflict: "user_id,date" }
+        { conflict: "user_id,date" }
       );
-      if (momRes.error) return { ok: false, error: momRes.error.message };
+      // Surface only genuine errors; missing table/columns degrade quietly.
+      if (!momRes.ok && !momRes.missingTable) return { ok: false, error: momRes.message };
     }
 
     // Anti-avoidance plan (only when there's a hardest thing to face).
     if (aa.success && aa.data.hardest_thing_i_did_not_want_to_do) {
       const a = aa.data;
-      const aaRes = await supabase.from("anti_avoidance_entries").upsert(
+      const aaRes = await writeRow(
+        supabase,
+        "anti_avoidance_entries",
         {
           user_id: userId,
           date: a.date,
@@ -148,9 +226,9 @@ export async function saveMorning(_prev: ActionState, formData: FormData): Promi
           avoidance_trigger: a.avoidance_trigger,
           what_helped_me_take_action: a.what_helped_me_take_action,
         },
-        { onConflict: "user_id,date" }
+        { conflict: "user_id,date" }
       );
-      if (aaRes.error) return { ok: false, error: aaRes.error.message };
+      if (!aaRes.ok && !aaRes.missingTable) return { ok: false, error: aaRes.message };
     }
 
     revalidatePath("/dashboard");
@@ -176,14 +254,24 @@ export async function saveEvening(_prev: ActionState, formData: FormData): Promi
   try {
     const { supabase, userId } = await requireUser();
 
-    const evRes = await supabase.from("cbt_evening_entries").insert({ ...ev.data, user_id: userId });
-    if (evRes.error) return { ok: false, error: evRes.error.message };
+    const evRes = await writeRow(supabase, "cbt_evening_entries", { ...ev.data, user_id: userId });
+    if (!evRes.ok) {
+      return {
+        ok: false,
+        error: evRes.missingTable
+          ? "Your database needs a one-time update before the evening practice can save. Run the latest SQL in Supabase → SQL Editor."
+          : evRes.message,
+      };
+    }
 
     if (sob.success) {
-      const sobRes = await supabase
-        .from("sobriety_entries")
-        .upsert({ ...sob.data, user_id: userId }, { onConflict: "user_id,date" });
-      if (sobRes.error) return { ok: false, error: sobRes.error.message };
+      const sobRes = await writeRow(
+        supabase,
+        "sobriety_entries",
+        { ...sob.data, user_id: userId },
+        { conflict: "user_id,date" }
+      );
+      if (!sobRes.ok && !sobRes.missingTable) return { ok: false, error: sobRes.message };
     }
 
     // Anti-avoidance review — update today's row (hardest thing carried
@@ -193,7 +281,9 @@ export async function saveEvening(_prev: ActionState, formData: FormData): Promi
     const didItRaw = (raw.did_i_do_it as string) ?? "";
     const didIt = ["true", "on", "1", "yes"].includes(didItRaw.toLowerCase());
     if (hardest || why || didIt) {
-      const aaRes = await supabase.from("anti_avoidance_entries").upsert(
+      const aaRes = await writeRow(
+        supabase,
+        "anti_avoidance_entries",
         {
           user_id: userId,
           date: ev.data.date,
@@ -201,9 +291,9 @@ export async function saveEvening(_prev: ActionState, formData: FormData): Promi
           did_i_do_it: didIt,
           notes: why || undefined,
         },
-        { onConflict: "user_id,date" }
+        { conflict: "user_id,date" }
       );
-      if (aaRes.error) return { ok: false, error: aaRes.error.message };
+      if (!aaRes.ok && !aaRes.missingTable) return { ok: false, error: aaRes.message };
     }
 
     revalidatePath("/dashboard");
@@ -438,7 +528,9 @@ export async function updateMomentumToday(
   try {
     const { supabase, userId } = await requireUser();
     const score = momentumScore(items);
-    const { error } = await supabase.from("daily_momentum_entries").upsert(
+    const res = await writeRow(
+      supabase,
+      "daily_momentum_entries",
       {
         user_id: userId,
         date,
@@ -446,10 +538,11 @@ export async function updateMomentumToday(
         most_important_action: mostImportant || undefined,
         momentum_score: score,
       },
-      { onConflict: "user_id,date" }
+      { conflict: "user_id,date" }
     );
-    if (error) return { ok: false, error: error.message };
+    if (!res.ok && !res.missingTable) return { ok: false, error: res.message };
     revalidatePath("/dashboard");
+    revalidatePath("/today");
     return { ok: true, message: "Updated." };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
@@ -460,10 +553,13 @@ export async function updateMomentumToday(
 export async function setHardThingDone(date: string, didIt: boolean): Promise<ActionState> {
   try {
     const { supabase, userId } = await requireUser();
-    const { error } = await supabase
-      .from("anti_avoidance_entries")
-      .upsert({ user_id: userId, date, did_i_do_it: didIt }, { onConflict: "user_id,date" });
-    if (error) return { ok: false, error: error.message };
+    const res = await writeRow(
+      supabase,
+      "anti_avoidance_entries",
+      { user_id: userId, date, did_i_do_it: didIt },
+      { conflict: "user_id,date" }
+    );
+    if (!res.ok && !res.missingTable) return { ok: false, error: res.message };
     revalidatePath("/dashboard");
     revalidatePath("/today");
     return { ok: true, message: "Updated." };
@@ -483,17 +579,21 @@ export async function setTodayFocus(date: string, text: string): Promise<ActionS
   try {
     const { supabase, userId } = await requireUser();
 
-    const aa = await supabase.from("anti_avoidance_entries").upsert(
+    const aa = await writeRow(
+      supabase,
+      "anti_avoidance_entries",
       { user_id: userId, date, hardest_thing_i_did_not_want_to_do: focus },
-      { onConflict: "user_id,date" }
+      { conflict: "user_id,date" }
     );
-    if (aa.error) return { ok: false, error: aa.error.message };
+    if (!aa.ok && !aa.missingTable) return { ok: false, error: aa.message };
 
-    const mom = await supabase.from("daily_momentum_entries").upsert(
+    const mom = await writeRow(
+      supabase,
+      "daily_momentum_entries",
       { user_id: userId, date, most_important_action: focus },
-      { onConflict: "user_id,date" }
+      { conflict: "user_id,date" }
     );
-    if (mom.error) return { ok: false, error: mom.error.message };
+    if (!mom.ok && !mom.missingTable) return { ok: false, error: mom.message };
 
     revalidatePath("/dashboard");
     revalidatePath("/today");
