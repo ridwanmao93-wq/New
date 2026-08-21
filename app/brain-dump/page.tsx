@@ -3,9 +3,10 @@ import { createClient } from "@/lib/supabase/server";
 import { extractThemes } from "@/lib/themes";
 import { PageHeader } from "@/components/page-header";
 import { FormShell } from "@/components/forms/form-shell";
-import { Field, DateField, Textarea } from "@/components/forms/field";
+import { Field, DateField } from "@/components/forms/field";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { DeleteNote } from "@/components/brain-dump/delete-note";
+import { VoiceDumpField } from "@/components/brain-dump/voice-dump-field";
 import { saveBrainDump } from "@/lib/actions";
 
 export const dynamic = "force-dynamic";
@@ -38,11 +39,7 @@ export default async function BrainDumpPage() {
           <FormShell action={saveBrainDump} submitLabel="Save dump">
             <DateField />
             <Field label="What's on your mind?">
-              <Textarea
-                name="content"
-                className="min-h-[180px]"
-                placeholder="Let it all out — worries, ideas, to-dos, feelings. Don't edit yourself."
-              />
+              <VoiceDumpField />
             </Field>
           </FormShell>
         </CardContent>
