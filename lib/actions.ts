@@ -22,6 +22,7 @@ import {
   meditationSchema,
   brainDumpSchema,
   taskSchema,
+  taskDetailSchema,
 } from "@/lib/validation/schemas";
 import { generateWeeklyReview } from "@/lib/analytics/weekly-review";
 import { momentumScore } from "@/lib/momentum";
@@ -516,6 +517,39 @@ export async function addTask(_prev: ActionState, formData: FormData): Promise<A
     { title: parsed.data.title, category: parsed.data.category },
     { revalidate: ["/tasks", "/dashboard"] }
   );
+}
+
+export async function updateTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
+  const parsed = taskDetailSchema.safeParse(formObject(formData));
+  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
+  const d = parsed.data;
+  try {
+    const { supabase, userId } = await requireUser();
+    // Self-heal around columns the DB might not have yet (0008 not run).
+    const res = await writeRow(
+      supabase,
+      "tasks",
+      {
+        id: d.id,
+        user_id: userId,
+        title: d.title,
+        category: d.category,
+        priority: d.priority,
+        description: d.description ?? null,
+        due_date: d.due_date,
+        duration_minutes: d.duration_minutes,
+        completed: d.completed,
+        completed_at: d.completed ? new Date().toISOString() : null,
+      },
+      { conflict: "id" }
+    );
+    if (!res.ok && !res.missingTable) return { ok: false, error: res.message };
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+    return { ok: true, message: "Saved." };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
 }
 
 export async function toggleTask(id: string, completed: boolean): Promise<ActionState> {

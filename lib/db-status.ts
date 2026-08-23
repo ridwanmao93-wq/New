@@ -20,6 +20,13 @@ const CHECKS: Check[] = [
   { key: "meditation", label: "Meditation timer", kind: "table", table: "meditation_sessions" },
   { key: "tasks", label: "Task list (work + personal)", kind: "table", table: "tasks" },
   {
+    key: "task_details",
+    label: "Task details (description, priority, due date)",
+    kind: "column",
+    table: "tasks",
+    column: "description",
+  },
+  {
     key: "meditation_col",
     label: "Meditation in the momentum checklist",
     kind: "column",
@@ -168,4 +175,12 @@ drop policy if exists "own rows" on public.tasks;
 create policy "own rows" on public.tasks
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 create index if not exists idx_tasks_user on public.tasks (user_id, category, completed, created_at desc);
+
+-- Richer task details (Motion-style popup)
+alter table public.tasks
+  add column if not exists description text,
+  add column if not exists priority text not null default 'medium'
+    check (priority in ('low', 'medium', 'high')),
+  add column if not exists due_date date,
+  add column if not exists duration_minutes integer;
 `;
