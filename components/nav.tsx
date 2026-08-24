@@ -24,6 +24,7 @@ import {
   Flower2,
   Settings,
   Activity,
+  Sparkle,
   Menu,
   X,
   LogOut,
@@ -51,6 +52,7 @@ const items = [
   { href: "/vision-board", label: "Vision Board", icon: ImageIcon },
   { href: "/settings", label: "Settings", icon: Settings },
   { href: "/system", label: "System status", icon: Activity },
+  { href: "/changelog", label: "What’s new", icon: Sparkle },
 ];
 
 export function Nav() {
