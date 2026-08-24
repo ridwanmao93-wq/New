@@ -21,7 +21,7 @@ export default async function TasksPage() {
 
   const { data, error } = await supabase
     .from("tasks")
-    .select("id, title, category, completed")
+    .select("*")
     .eq("user_id", user.id)
     .order("completed", { ascending: true })
     .order("created_at", { ascending: false });

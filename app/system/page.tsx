@@ -4,6 +4,7 @@ import { checkDbStatus, CATCH_UP_SQL } from "@/lib/db-status";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { SqlBlock } from "@/components/system/sql-block";
+import { ApplyUpdates } from "@/components/system/apply-updates";
 
 export const dynamic = "force-dynamic";
 
@@ -63,9 +64,22 @@ export default async function SystemPage() {
             </CardContent>
           </Card>
 
+          <Card className="border-primary/30">
+            <CardHeader className="pb-2">
+              <CardTitle className="text-base">Fastest: apply it automatically</CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-3 text-sm">
+              <p className="text-muted-foreground">
+                One tap and the app runs the update for you — no SQL editor. (Needs a one-time
+                DATABASE_URL setup in Vercel; the button will walk you through it if it’s not set.)
+              </p>
+              <ApplyUpdates />
+            </CardContent>
+          </Card>
+
           <Card>
             <CardHeader className="pb-2">
-              <CardTitle className="text-base">How to fix it — takes 30 seconds</CardTitle>
+              <CardTitle className="text-base">Or do it by hand — takes 30 seconds</CardTitle>
             </CardHeader>
             <CardContent className="space-y-4 text-sm">
               <ol className="list-decimal space-y-1.5 pl-5 text-muted-foreground">

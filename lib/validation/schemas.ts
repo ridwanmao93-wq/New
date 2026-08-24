@@ -337,6 +337,28 @@ export const taskSchema = z.object({
 });
 export type TaskInput = z.infer<typeof taskSchema>;
 
+/** Full task edit (from the detail popup). */
+export const taskDetailSchema = z.object({
+  id: z.string().uuid("Bad task id"),
+  title: z.string().trim().min(1, "Give the task a title").max(300, "Keep it under 300 characters"),
+  category: z.enum(["work", "personal"]),
+  priority: z.enum(["low", "medium", "high"]).default("medium"),
+  description: optionalText,
+  due_date: z
+    .union([z.literal(""), z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Date must be YYYY-MM-DD")])
+    .optional()
+    .transform((v) => (v && v !== "" ? v : null)),
+  duration_minutes: z
+    .union([z.literal(""), z.coerce.number().int().positive()])
+    .optional()
+    .transform((v) => (v === "" || v === undefined ? null : v)),
+  completed: z
+    .union([z.literal("true"), z.literal("false"), z.literal("on"), z.boolean()])
+    .optional()
+    .transform((v) => v === true || v === "true" || v === "on"),
+});
+export type TaskDetailInput = z.infer<typeof taskDetailSchema>;
+
 /* ------------------------------------------------------------------ */
 /* Vision board                                                        */
 /* ------------------------------------------------------------------ */
