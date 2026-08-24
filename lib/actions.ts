@@ -519,6 +519,37 @@ export async function addTask(_prev: ActionState, formData: FormData): Promise<A
   );
 }
 
+/**
+ * Add several tasks at once — used by the "Speak your tasks" voice capture,
+ * which parses spoken text into multiple titles. Each item carries its own
+ * category so a single dictation can mix work and personal.
+ */
+export async function addManyTasks(
+  items: { title: string; category: "work" | "personal" }[]
+): Promise<ActionState> {
+  const clean = (items ?? [])
+    .map((t) => ({ title: (t.title ?? "").trim().slice(0, 300), category: t.category }))
+    .filter((t) => t.title.length > 0 && (t.category === "work" || t.category === "personal"))
+    .slice(0, 50);
+  if (!clean.length) return { ok: false, error: "No tasks to add." };
+  try {
+    const { supabase, userId } = await requireUser();
+    const rows = clean.map((t) => ({ ...t, user_id: userId }));
+    const { error } = await supabase.from("tasks").insert(rows);
+    if (error) {
+      if (/Could not find the table/i.test(error.message)) {
+        return { ok: false, error: "The task list needs a one-time database update — see System status." };
+      }
+      return { ok: false, error: error.message };
+    }
+    revalidatePath("/tasks");
+    revalidatePath("/dashboard");
+    return { ok: true, message: `Added ${clean.length} task${clean.length === 1 ? "" : "s"}.` };
+  } catch (e) {
+    return { ok: false, error: e instanceof Error ? e.message : "Unexpected error" };
+  }
+}
+
 export async function updateTask(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = taskDetailSchema.safeParse(formObject(formData));
   if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
