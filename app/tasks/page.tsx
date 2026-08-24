@@ -3,6 +3,7 @@ import { createClient } from "@/lib/supabase/server";
 import { PageHeader } from "@/components/page-header";
 import { Card, CardContent } from "@/components/ui/card";
 import { TaskBoard, type Task } from "@/components/tasks/task-board";
+import { VoiceTasks } from "@/components/tasks/voice-tasks";
 
 export const dynamic = "force-dynamic";
 
@@ -46,7 +47,10 @@ export default async function TasksPage() {
           </CardContent>
         </Card>
       ) : (
-        <TaskBoard tasks={tasks} />
+        <>
+          <VoiceTasks />
+          <TaskBoard tasks={tasks} />
+        </>
       )}
     </div>
   );
