@@ -10,7 +10,6 @@ import {
   weightSchema,
   hydrationSchema,
   weeklyReviewNotesSchema,
-  alignmentSchema,
   sobrietySchema,
   debtSchema,
   momentumSchema,
@@ -349,37 +348,10 @@ export async function saveHydration(_prev: ActionState, formData: FormData): Pro
 
 /* --------------------------- Life OS ----------------------------- */
 
-export async function saveAlignment(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = alignmentSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
-  return save("daily_alignment_entries", parsed.data, { conflict: "user_id,date" });
-}
-
-export async function saveSobriety(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = sobrietySchema.safeParse(formObject(formData));
-  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
-  return save("sobriety_entries", parsed.data, { conflict: "user_id,date" });
-}
-
 export async function saveDebt(_prev: ActionState, formData: FormData): Promise<ActionState> {
   const parsed = debtSchema.safeParse(formObject(formData));
   if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
   return save("debt_entries", parsed.data, { revalidate: ["/dashboard", "/future-self"] });
-}
-
-export async function saveMomentum(_prev: ActionState, formData: FormData): Promise<ActionState> {
-  const parsed = momentumSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
-  return save("daily_momentum_entries", parsed.data, { conflict: "user_id,date" });
-}
-
-export async function saveAntiAvoidance(
-  _prev: ActionState,
-  formData: FormData
-): Promise<ActionState> {
-  const parsed = antiAvoidanceSchema.safeParse(formObject(formData));
-  if (!parsed.success) return { ok: false, error: zodMessage(parsed.error) };
-  return save("anti_avoidance_entries", parsed.data, { conflict: "user_id,date" });
 }
 
 export async function saveRelationship(
